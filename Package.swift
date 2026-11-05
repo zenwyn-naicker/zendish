@@ -5,10 +5,18 @@ let package = Package(
     name: "Zendish",
     platforms: [.macOS(.v14)],
     products: [
+        .executable(name: "Zendish", targets: ["Zendish"]),
         .library(name: "ZendishCore", targets: ["ZendishCore"]),
     ],
     targets: [
         .target(name: "ZendishCore"),
-        .testTarget(name: "ZendishCoreTests", dependencies: ["ZendishCore"]),
+        .target(name: "ZendishUI", dependencies: ["ZendishCore"]),
+        .executableTarget(name: "Zendish", dependencies: ["ZendishUI"]),
+        .testTarget(
+            name: "ZendishCoreTests",
+            dependencies: ["ZendishCore"],
+            resources: [.copy("Fixtures")]
+        ),
+        .testTarget(name: "ZendishUITests", dependencies: ["ZendishUI"]),
     ]
 )
