@@ -59,7 +59,7 @@ struct ReviewView: View {
                     isFinished = true
                     model.saveToCookbook(draft)
                 }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(PrimaryButtonStyle())
                     .keyboardShortcut("s")
             }
         }
@@ -115,6 +115,7 @@ struct ReviewView: View {
             if draft.coverName != nil {
                 Button("Remove Photo") { draft.coverName = nil }
                     .buttonStyle(.link)
+                    .foregroundStyle(Theme.accent)
             }
         }
     }
@@ -169,6 +170,7 @@ struct ReviewView: View {
             }
             Button("Add Ingredient", systemImage: "plus") { draft.ingredients.append(Ingredient(text: "")) }
                 .buttonStyle(.borderless)
+                .foregroundStyle(Theme.accent)
         }
     }
 
@@ -178,7 +180,7 @@ struct ReviewView: View {
             ForEach(draft.steps.indices, id: \.self) { index in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text("\(index + 1).")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .monospacedDigit()
                     EditableRow(text: $draft.steps[index], placeholder: "Step", isFlagged: false) {
                         draft.steps.remove(at: index)
@@ -187,6 +189,7 @@ struct ReviewView: View {
             }
             Button("Add Step", systemImage: "plus") { draft.steps.append("") }
                 .buttonStyle(.borderless)
+                .foregroundStyle(Theme.accent)
         }
     }
 
@@ -223,7 +226,7 @@ private struct Label2: View {
     init(_ title: String) { self.title = title }
 
     var body: some View {
-        Text(title).font(.caption).foregroundStyle(.secondary)
+        Text(title).font(.caption).foregroundStyle(Theme.muted)
     }
 }
 
@@ -232,7 +235,7 @@ private struct SectionTitle: View {
     init(_ title: String) { self.title = title }
 
     var body: some View {
-        Text(title).font(.headline)
+        Text(title).font(.headline).foregroundStyle(Theme.accent)
     }
 }
 
@@ -249,7 +252,8 @@ private struct EditableRow: View {
                 .textFieldStyle(.plain)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 5)
-                .background(isFlagged ? AnyShapeStyle(Color.orange.opacity(0.14)) : AnyShapeStyle(.quaternary.opacity(0.22)), in: .rect(cornerRadius: 6))
+                .background(isFlagged ? Theme.flagFill : Theme.surface, in: .rect(cornerRadius: 7))
+                .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(isFlagged ? Theme.flag.opacity(0.4) : Theme.line, lineWidth: 0.5))
             Button("Remove", systemImage: "xmark.circle.fill", action: remove)
                 .labelStyle(.iconOnly)
                 .buttonStyle(.borderless)
@@ -273,12 +277,13 @@ private struct QuantityFlagView: View {
     var body: some View {
         HStack(spacing: 10) {
             Text("Should this be “\(shortSuggestion)”?")
-                .foregroundStyle(.orange)
+                .foregroundStyle(Theme.flag)
             Button("Use This", action: use)
             Button("Keep As Is", action: keep)
         }
         .font(.callout)
         .buttonStyle(.link)
+        .foregroundStyle(Theme.accent)
         .padding(.leading, 8)
     }
 }
@@ -291,12 +296,13 @@ private struct MissingLineView: View {
     var body: some View {
         HStack(spacing: 10) {
             Text("In the image, not on the card: \(line)")
-                .foregroundStyle(.orange)
+                .foregroundStyle(Theme.flag)
             Button("Add", action: add)
             Button("Ignore", action: ignore)
         }
         .font(.callout)
         .buttonStyle(.link)
+        .foregroundStyle(Theme.accent)
         .padding(.leading, 8)
     }
 }
@@ -308,13 +314,13 @@ private struct Banner<Action: View>: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: systemImage).foregroundStyle(.orange)
+            Image(systemName: systemImage).foregroundStyle(Theme.flag)
             Text(text).fixedSize(horizontal: false, vertical: true)
             Spacer()
             action()
         }
         .padding(12)
-        .background(Color.orange.opacity(0.1), in: .rect(cornerRadius: 8))
+        .background(Theme.flagFill, in: .rect(cornerRadius: 8))
     }
 }
 
@@ -333,7 +339,7 @@ struct OriginalImagesView: View {
             }
             .padding(14)
         }
-        .background(.quaternary.opacity(0.35))
+        .background(Theme.sidebar)
     }
 }
 

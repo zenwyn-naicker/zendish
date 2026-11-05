@@ -1,29 +1,36 @@
 <p align="center">
-  <img src="assets/icon.png" width="96" alt="Zendish icon">
+  <img src="assets/icon.png" width="104" alt="Zendish icon">
 </p>
 
 <h1 align="center">Zendish</h1>
 
 <p align="center"><strong>Turn recipe screenshots into a cookbook you'll actually use.</strong><br>
 Drop in a screenshot or photo, check the card beside the original, and save it.<br>
-Free, powered by local AI through Ollama, and everything stays on your Mac.</p>
+Free, powered by local AI, and everything stays on your Mac.</p>
 
 <p align="center">
   <a href="https://github.com/zenwyn-naicker/zendish/releases/latest/download/Zendish.dmg"><strong>Download for Mac</strong></a>
 </p>
 
+<p align="center"><sub>Apple Silicon Mac · macOS 14 or later · 16 GB of memory · No account needed</sub></p>
+
 ![Zendish showing a recipe card beside its original screenshot, with a misread quantity flagged](docs/screenshots/review.png)
+
+## How it works
+
+| 1. Add | 2. Check | 3. Cook |
+|---|---|---|
+| Drag in a screenshot or photo of any recipe. Several images can make up one recipe. | Zendish writes a clean card and shows it beside the original, flagging anything that looks wrong. | Save it to your cookbook, find it again in seconds, and export a PDF for the kitchen. |
 
 ## What it does
 
-- **Add images your way:** drag them into the window or choose them from your Mac. Several images can make up one recipe.
-- **Get a clean card:** Zendish reads the text and writes out the title, ingredients, steps, time and servings.
-- **Check it against the original:** each card opens beside its images, so mistakes are easy to spot.
-- **See what needs attention:** Zendish flags quantities that look misread and ingredients it thinks were missed.
+- **Tidy cards from messy screenshots:** ads, comments and clutter are left out, leaving the title, ingredients, steps, time and servings.
+- **Mistakes are easy to catch:** Zendish flags quantities that look misread and ingredients it thinks were missed.
 - **No made-up details:** if a time or serving count isn't clearly labelled in the image, it stays blank.
-- **Build your cookbook:** organise recipes into collections, and search by dish or ingredient.
-- **Take it to the kitchen:** export a recipe or a whole collection as a PDF.
-- **Light or dark:** follows your Mac by default, or choose one in Settings.
+- **A cookbook you'll use:** browse your cards, add a photo, and sort recipes into collections like "Weeknight dinners".
+- **Find anything fast:** search by dish or ingredient.
+- **Ready for the kitchen:** export one recipe or a whole collection as a PDF.
+- **Easy on the eyes:** a calm, fresh design in light or dark.
 
 ## Screenshots
 
@@ -31,17 +38,17 @@ Free, powered by local AI through Ollama, and everything stays on your Mac.</p>
 |---|---|
 | ![A grid of recipe cards with collections in the sidebar](docs/screenshots/cookbook.png) | ![A recipe with its ingredients beside the method](docs/screenshots/recipe.png) |
 
-| Dark mode |
-|---|
-| ![The cookbook in dark mode](docs/screenshots/dark.png) |
+<p align="center">
+  <img src="docs/screenshots/dark.png" width="70%" alt="The cookbook in dark mode">
+</p>
 
-*The recipes and food illustrations shown are invented for testing.*
+<p align="center"><sub>The recipes and food illustrations shown are invented for testing.</sub></p>
 
 ## Install Zendish
 
-You'll need a Mac with Apple Silicon (M1 or newer), macOS 14 or later, 16 GB of memory, about 10 GB of free space, and internet for the first setup. You won't need Terminal or an account.
+It takes about 15 minutes, mostly waiting for downloads. You won't need Terminal.
 
-**1. Install Zendish**
+**1. Install the app**
 
 1. [Download Zendish.dmg](https://github.com/zenwyn-naicker/zendish/releases/latest/download/Zendish.dmg) and open it.
 2. Drag **Zendish** onto the **Applications** folder.
@@ -55,19 +62,15 @@ Zendish is a free project and isn't registered with Apple, so macOS blocks it th
 3. Scroll down to the message about Zendish and click **Open Anyway**.
 4. Enter your Mac password if asked, then click **Open Anyway** again.
 
-**3. Install Ollama**
+**3. Set up the AI**
 
-Ollama is the free app that runs the AI on your Mac, so your recipes never leave it.
+Ollama is the free app that runs the AI on your Mac, so your recipes never leave it. Zendish guides you through this in a bar at the top of the window:
 
-1. Click **Open Ollama** in the bar at the top of Zendish. If Ollama isn't installed yet, this opens its download page.
+1. Click **Open Ollama**. If it isn't installed yet, this opens its download page.
 2. Download Ollama, move it to Applications and open it. You don't need to sign in.
-3. Zendish notices when Ollama is running.
+3. When Zendish notices Ollama is running, click **Download** to get the AI model. It's a one-time download of about 7.6 GB, so you'll need about 10 GB of free space.
 
-**4. Download the AI model**
-
-Click **Download** in the bar at the top of Zendish. It's a one-time download of about 7.6 GB, and you'll see its progress.
-
-**5. Add your first recipe**
+**4. Add your first recipe**
 
 1. Drag a recipe screenshot into the window, or click **Choose Images**.
 2. When the card is ready, open it from **To Review**.
@@ -88,9 +91,22 @@ Click **Download** in the bar at the top of Zendish. It's a one-time download of
 - The AI runs on your Mac through Ollama. Zendish has no accounts, tracking or analytics.
 - Zendish only connects to Ollama on your own Mac. The internet is only used to download Ollama and its model.
 - Your images and recipes stay in `~/Library/Application Support/Zendish`.
-- Recipes you save are for your own use, so please respect the original authors' copyright.
 
-# For developers
+## Common questions
+
+**Is it really free?** Yes. There are no subscriptions, accounts or usage limits.
+
+**How accurate is it?** It's good, but it isn't perfect, which is why every card is checked beside its original before saving. You can see the test results [below](#evaluation).
+
+**Does it work with handwritten recipes?** That hasn't been tested yet. Zendish is made for clear, printed text.
+
+**Can I use it on my phone?** Not yet, because accurate local AI needs more memory than most phones have. Your screenshots can reach your Mac through iCloud Photos or AirDrop.
+
+**Can I share my cookbook publicly?** Zendish is made for personal use, so please respect the original authors' copyright.
+
+---
+
+<h1 align="center">For developers</h1>
 
 ## How it works
 

@@ -25,6 +25,8 @@ Why Zendish is built the way it is. For how to install and use it, see the [READ
 | Original images copied into app storage | Recipes keep working if the originals move |
 | Cover photo chosen by hand | A drag is simple and always right, and there's no reliable way to find the food in every screenshot |
 | SQLite full-text search | Dish and ingredient names work well with word search, so no embedding model is needed |
+| The Fresh Herb theme | Research pointed to muted greens, soft neutrals and whitespace for health apps. Colour is used sparingly, so warm amber always means "check this" |
+| Theme colours kept in one place | Every colour has a light and dark value that meets WCAG AA contrast |
 | Models and storage kept out of the UI | Almost everything can be tested without opening a window |
 
 ## What was left out
