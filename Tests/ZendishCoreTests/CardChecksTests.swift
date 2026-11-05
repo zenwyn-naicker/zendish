@@ -189,6 +189,33 @@ import Testing
         func writeCard(from text: String) async throws -> CardDraft { throw OllamaError.notRunning }
     }
 
+    /// Gives an empty card first, then a full one, like a model having a brief slip.
+    final class SlippingWriter: CardWriter, @unchecked Sendable {
+        private let lock = NSLock()
+        private var calls = 0
+        var callCount: Int { lock.withLock { calls } }
+
+        func writeCard(from text: String) async throws -> CardDraft {
+            let call = lock.withLock { calls += 1; return calls }
+            return call == 1 ? CardDraft(isRecipe: false) : CardDraft(title: "Soup", ingredients: ["2 cups stock"], steps: ["Stir."])
+        }
+    }
+
+    @Test func anEmptyCardIsTriedOnceMore() async throws {
+        let writer = SlippingWriter()
+        let card = try await CardMaker(writer: writer).makeCard(fromText: "Soup\n2 cups stock\n1 tsp salt\nStir.")
+        #expect(writer.callCount == 2)
+        #expect(card.hasRecipe)
+        #expect(card.recipe.ingredients.count == 1)
+    }
+
+    @Test func aFullCardIsNotTriedAgain() async throws {
+        let writer = SlippingWriter()
+        _ = try await writer.writeCard(from: "")
+        _ = try await CardMaker(writer: writer).makeCard(fromText: "Soup\n2 cups stock\n1 tsp salt\nStir.")
+        #expect(writer.callCount == 2)
+    }
+
     @Test func imagesWithoutARecipeNeverReachTheModel() async throws {
         let maker = CardMaker(writer: FailingWriter())
         let card = try await maker.makeCard(fromText: "A lovely sunset", imageNames: ["a.png"])
