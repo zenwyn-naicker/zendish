@@ -160,7 +160,7 @@ Each model was tested on the same 20 invented recipe pages, including two images
 | `qwen3.5:9b` | 18 | 2 | About 14 seconds | 7.6 GB |
 | `gemma4:12b` | 19 | 1 | About 15 seconds | 7.7 GB |
 
-`qwen3.5:9b` and Apple's model were then tested on 10 real recipe websites, with each flagged card checked by hand. `gemma4:12b` wasn't part of this test.
+`qwen3.5:9b` and Apple's model were then tested on 10 real recipe websites, with each flagged card checked by hand.
 
 | Result on real pages | `qwen3.5:9b` | Apple's on-device model |
 |---|---|---|
@@ -170,9 +170,21 @@ Each model was tested on the same 20 invented recipe pages, including two images
 | Typical time per card | About 25 seconds | About 6 seconds |
 | Slowest card | 60 seconds | 14 seconds |
 
+The two strongest local models then went head to head, running twice each on the same 10 real pages with Zendish's card checks in place.
+
+| Head to head on real pages | `qwen3.5:9b` | `gemma4:12b` |
+|---|---|---|
+| Typical time per card | About 26 seconds | About 32 seconds |
+| Slowest card | 52 seconds | 58 seconds |
+| Most memory reported by Ollama | 9.1 GB | 12 GB |
+| Lowest free memory on the Mac | 11% | 12% |
+| Cards identical across both runs | 8 of 10 | 6 of 10 |
+| Empty or stepless cards, out of 20 | 1 | 1 |
+| Unrelated page text used as a title | 0 | 2 |
+
 **Why `qwen3.5:9b`**
 
-It made fewer factual mistakes than Apple's model on real pages, and it gave identical cards across repeat runs. `gemma4:12b` scored one card higher, but only through an inconsistent guess, and it used more memory. Apple's model is much faster and needs no setup, which makes it a strong option for the future, but it needs Apple Intelligence turned on and it filled in wrong details more often.
+`gemma4:12b` scored one card higher on invented pages, but on real pages it was slower, less consistent and used unrelated page text as a title. Both models got the ingredients right, and each returned one unusable card out of 20, so Zendish now tries an empty card once more. Apple's model is much faster and needs no setup, which makes it a strong option for the future, but it needs Apple Intelligence turned on and it filled in wrong details more often.
 
 **The whole pipeline**
 

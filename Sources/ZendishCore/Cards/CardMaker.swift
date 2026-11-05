@@ -30,7 +30,15 @@ public struct CardMaker: Sendable {
             let recipe = Recipe(imageNames: imageNames, flags: [.noRecipe], sourceText: text)
             return MadeCard(recipe: recipe, flags: [.noRecipe], cleared: [], sourceText: text, hasRecipe: false)
         }
-        let draft = try await writer.writeCard(from: text)
+        var draft = try await writer.writeCard(from: text)
+        // The text has ingredient lines, so an empty card is a slip by the model. Small models
+        // do this now and then on the same text, and a second try usually works.
+        if draft.ingredients.isEmpty || draft.steps.isEmpty {
+            let second = try await writer.writeCard(from: text)
+            if second.ingredients.count + second.steps.count > draft.ingredients.count + draft.steps.count {
+                draft = second
+            }
+        }
         let checked = CardChecks.check(draft, against: text)
         let card = checked.draft
         let recipe = Recipe(

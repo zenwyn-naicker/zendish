@@ -331,10 +331,11 @@ public final class AppModel {
         }
     }
 
-    public func chooseCover(for recipe: Recipe, from imageName: String, crop: CGRect) throws -> String {
-        let cover = try library.cropCover(from: imageName, to: crop)
-        if let old = recipe.coverName { library.remove([old]) }
-        return cover
+    /// Copies a photo into the library for the card, removing any it replaces.
+    public func choosePhoto(from url: URL, replacing old: String?) throws -> String {
+        let name = try library.add(url)
+        if let old { library.remove([old]) }
+        return name
     }
 
     /// Asks where to save, then writes the recipes to a PDF.

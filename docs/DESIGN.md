@@ -15,7 +15,8 @@ Why Zendish is built the way it is. For how to install and use it, see the [READ
 |---|---|
 | Native SwiftUI | Text recognition, HEIC images and PDF drawing come with macOS, which keeps the app small and leaves no helper program |
 | macOS text recognition, then a text model | Recognition was accurate and fast on recipe screenshots, and a text model is smaller and easier to test than a vision model |
-| `qwen3.5:9b` through Ollama | It was the most accurate model tested that runs on a 16 GB Mac, and it gave identical cards across repeat runs |
+| `qwen3.5:9b` through Ollama | In a head-to-head on real pages it was faster, used less memory and was more consistent than `gemma4:12b`, with the same accuracy on ingredients |
+| One automatic retry for empty cards | The model occasionally returns nothing for a page that clearly has a recipe |
 | Plain-code card checks after the model | Small models fill blanks and drop sections, and checks that use no AI behave the same way every time |
 | Flags instead of silent fixes | A misread quantity is easy to miss, so a person always decides |
 | Times and servings need a nearby label | This stops video timers, like counts and times from inside the method appearing on a card |
@@ -23,7 +24,7 @@ Why Zendish is built the way it is. For how to install and use it, see the [READ
 | A hard limit on the model's output | A stuck model can't hang a card forever |
 | One card read at a time | The model uses most of the Mac's memory |
 | Original images copied into app storage | Recipes keep working if the originals move |
-| Cover photo chosen by hand | A drag is simple and always right, and there's no reliable way to find the food in every screenshot |
+| Card photos added by hand | Many screenshots have no food photo, so choosing your own is simpler and always right |
 | SQLite full-text search | Dish and ingredient names work well with word search, so no embedding model is needed |
 | The Fresh Herb theme | Research pointed to muted greens, soft neutrals and whitespace for health apps. Colour is used sparingly, so warm amber always means "check this" |
 | Step cards on the recipe page | Each step has its own card, which makes it easier to keep your place while cooking |

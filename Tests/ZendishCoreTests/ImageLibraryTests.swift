@@ -58,7 +58,7 @@ import UniformTypeIdentifiers
         #expect(library.url(for: "../../secret.txt").deletingLastPathComponent().standardizedFileURL == folder.standardizedFileURL)
     }
 
-    @Test func thumbnailsAndCropsHaveTheRightSize() throws {
+    @Test func thumbnailsHaveTheRightSize() throws {
         let folder = try makeFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         let original = folder.appendingPathComponent("photo.png")
@@ -68,10 +68,5 @@ import UniformTypeIdentifiers
 
         let thumbnail = try #require(library.thumbnail(named: name, maxPixels: 100))
         #expect(max(thumbnail.width, thumbnail.height) == 100)
-
-        let cover = try library.cropCover(from: name, to: CGRect(x: 0.5, y: 0, width: 0.5, height: 1))
-        let cropped = try #require(library.thumbnail(named: cover, maxPixels: 2000))
-        #expect(cropped.width == 500)
-        #expect(cropped.height == 500)
     }
 }
