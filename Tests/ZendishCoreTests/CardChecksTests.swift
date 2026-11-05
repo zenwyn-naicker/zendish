@@ -32,8 +32,8 @@ import Testing
     }
 
     @Test func ordinaryQuantitiesAreNotFlagged() {
-        let card = CardDraft(ingredients: ["1 1/2 cups milk", "1/2 tsp salt", "12 eggs", "2.5 l stock"])
-        let flags = CardChecks.check(card, against: "").flags
+        let card = CardDraft(title: "Stock", ingredients: ["1 1/2 cups milk", "1/2 tsp salt", "12 eggs", "2.5 l stock"])
+        let flags = CardChecks.check(card, against: "Stock").flags
         #expect(flags.isEmpty)
     }
 
@@ -49,8 +49,8 @@ import Testing
     }
 
     @Test func aLineSplitInTwoOnTheCardIsNotReportedMissing() {
-        let text = "Ingredients\n250 g cake flour, plus extra for dusting\n2 large eggs\nMethod\nMix well."
-        let card = CardDraft(ingredients: ["250 g cake flour", "extra for dusting", "2 large eggs"], steps: ["Mix well."])
+        let text = "Cake\nIngredients\n250 g cake flour, plus extra for dusting\n2 large eggs\nMethod\nMix well."
+        let card = CardDraft(title: "Cake", ingredients: ["250 g cake flour", "extra for dusting", "2 large eggs"], steps: ["Mix well."])
         #expect(CardChecks.check(card, against: text).flags.isEmpty)
     }
 
@@ -83,6 +83,53 @@ import Testing
         #expect(CardChecks.check(CardDraft(title: "Golden Soup"), against: page).draft.title == "Golden Soup")
     }
 
+    @Test func siteLogosAreNotUsedAsTitles() {
+        let text = "goodfood\nRecipetineats\nChakalaka\n2 cups beans\n1 tsp salt"
+        #expect(CardChecks.check(CardDraft(title: "goodfood", ingredients: ["2 cups beans"]), against: text).draft.title == nil)
+        #expect(CardChecks.check(CardDraft(title: "Recipetineats"), against: text).draft.title == nil)
+        #expect(CardChecks.check(CardDraft(title: "Chakalaka"), against: text).draft.title == "Chakalaka")
+    }
+
+    @Test func aMissingTitleAsksForOne() {
+        let card = CardDraft(ingredients: ["2 cups stock"])
+        #expect(CardChecks.check(card, against: page).flags.contains(.needsTitle))
+        let named = CardDraft(title: "Golden Soup", ingredients: ["2 cups stock"])
+        #expect(!CardChecks.check(named, against: page).flags.contains(.needsTitle))
+    }
+
+    @Test func splitNotesJoinTheIngredientAbove() {
+        let card = CardDraft(ingredients: [
+            "225g self-raising flour", "preferably organic", "50g slightly salted butter", "chilled, cut in small pieces",
+            "a little extra flour", "for dusting", "strawberry jam and clotted cream, to serve",
+        ])
+        #expect(CardChecks.check(card, against: "").draft.ingredients == [
+            "225g self-raising flour, preferably organic",
+            "50g slightly salted butter, chilled, cut in small pieces",
+            "a little extra flour, for dusting",
+            "strawberry jam and clotted cream, to serve",
+        ])
+    }
+
+    @Test func shoutedTitlesAreCalmedDown() {
+        let draft = CardChecks.check(CardDraft(title: "MILK TART"), against: "MILK TART").draft
+        #expect(draft.title == "Milk Tart")
+    }
+
+    @Test func subHeadingsBecomeSections() {
+        let lines = ["SPICE PASTE", "2 tbsp oil", "Filling", "1 onion", "For the sauce", "1 tsp honey", "Salt, to taste"]
+        #expect(CardChecks.ingredients(from: lines) == [
+            Ingredient(text: "2 tbsp oil", section: "Spice Paste"),
+            Ingredient(text: "1 onion", section: "Filling"),
+            Ingredient(text: "1 tsp honey", section: "For the sauce"),
+            Ingredient(text: "Salt, to taste", section: "For the sauce"),
+        ])
+    }
+
+    @Test func ordinaryIngredientsAreNotMistakenForHeadings() {
+        let lines = ["Cubed ice", "Crushed ice", "Dash of soda water", "fresh cilantro", "Salt"]
+        #expect(CardChecks.ingredients(from: lines).map(\.text) == lines)
+    }
+
     @Test func stepNumbersAndBulletsAreRemoved() {
         let card = CardDraft(ingredients: ["• 2 eggs"], steps: ["1. Beat the eggs.", "2) Fry."])
         let draft = CardChecks.check(card, against: page).draft
@@ -93,6 +140,33 @@ import Testing
     @Test func textWithoutARecipeIsRecognised() {
         #expect(CardChecks.hasRecipe(in: page))
         #expect(!CardChecks.hasRecipe(in: "Dinner was amazing! Recipe soon. 2,418 likes"))
+    }
+}
+
+@Suite struct IngredientPartsTests {
+    @Test(arguments: [
+        ("225g self-raising flour", "225g", "self-raising flour"),
+        ("1 ½ tbsp olive oil", "1 ½ tbsp", "olive oil"),
+        ("¾ cup / 180 ml oat cream", "¾ cup / 180 ml", "oat cream"),
+        ("2 small leeks, sliced", "2", "small leeks, sliced"),
+        ("1/2 tsp salt", "1/2 tsp", "salt"),
+        ("11/2 cups thick poha", "11/2 cups", "thick poha"),
+        ("2-3 cloves garlic", "2-3 cloves", "garlic"),
+        ("1 lemon", "1", "lemon"),
+        ("3/4 cup (150g) packed brown sugar", "3/4 cup", "(150g) packed brown sugar"),
+        ("pinch of salt", "Pinch", "salt"),
+        ("A pinch of saffron", "Pinch", "saffron"),
+    ])
+    func amountsAreSeparated(line: String, quantity: String, name: String) {
+        let parts = Ingredient(text: line).parts
+        #expect(parts.quantity == quantity)
+        #expect(parts.name == name)
+    }
+
+    @Test func linesWithoutAnAmountStayWhole() {
+        #expect(Ingredient(text: "Salt, to taste").parts.quantity == nil)
+        #expect(Ingredient(text: "Salt, to taste").parts.name == "Salt, to taste")
+        #expect(Ingredient(text: "400").parts.quantity == nil)
     }
 }
 

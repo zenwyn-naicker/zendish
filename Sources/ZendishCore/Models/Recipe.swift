@@ -82,6 +82,20 @@ public struct Ingredient: Equatable, Sendable {
     public var text: String
     public var section: String?
 
+    /// The line split into its amount and the rest, so amounts can line up in a column. The
+    /// text itself is never changed, and a line with no clear amount has a nil quantity.
+    public var parts: (quantity: String?, name: String) {
+        if let pinch = text.firstMatch(of: /(?i)^(a )?pinch of (.+)$/) {
+            return ("Pinch", String(pinch.2))
+        }
+        let pattern = /(?i)^((?:\d[\d\s.,\/\-–]*|[¼½¾⅓⅔⅛]\s*)[¼½¾⅓⅔⅛]?\s*(?:(?:g|kg|ml|l|oz|lb|lbs|cups?|tbsp|tsp|t|tablespoons?|teaspoons?|cloves?|cans?|parts?|sheets?|pinch(?:es)?)\b)?(?:\s*\/\s*\d[\d.]*\s*(?:g|kg|ml|l|oz|lb)\b)?)\s*(.+)$/
+        guard let match = text.firstMatch(of: pattern) else { return (nil, text) }
+        let quantity = String(match.1).trimmingCharacters(in: .whitespaces)
+        let name = String(match.2)
+        guard !quantity.isEmpty, name.first?.isLetter == true || name.first == "(" else { return (nil, text) }
+        return (quantity, name)
+    }
+
     public init(text: String, section: String? = nil) {
         self.text = text
         self.section = section

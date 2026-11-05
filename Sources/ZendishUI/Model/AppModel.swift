@@ -415,7 +415,9 @@ public final class AppModel {
             selection = .toReview
             openRecipeID = reviewQueue.first { !$0.flags.isEmpty }?.id ?? reviewQueue.first?.id
         case "queue": selection = .toReview
-        case "recipe": openRecipeID = recipes.first { $0.status == .saved && $0.coverName != nil }?.id
+        case "recipe":
+            let title = environment["ZENDISH_TITLE"]
+            openRecipeID = recipes.first { title == nil ? $0.status == .saved && $0.coverName != nil : $0.title == title }?.id
         case "collection": selection = collections.first.map { .collection($0.id) } ?? .all
         default: break
         }

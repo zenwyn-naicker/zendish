@@ -42,7 +42,7 @@ Free, powered by local AI, and everything stays on your Mac.</p>
   <img src="docs/screenshots/dark.png" width="70%" alt="The cookbook in dark mode">
 </p>
 
-<p align="center"><sub>The recipes and food illustrations shown are invented for testing.</sub></p>
+<p align="center"><sub>The recipes shown are invented for testing, and their food photos are AI-generated.</sub></p>
 
 ## Install Zendish
 
@@ -147,15 +147,40 @@ The app is ad-hoc signed rather than notarised, because notarising needs a paid 
 
 ## Evaluation
 
-These results come from one Mac, a 16 GB M3 MacBook Air, using `qwen3.5:9b`.
+All results come from one Mac, a 16 GB M3 MacBook Air, using macOS text recognition followed by each model. Cards were scored before Zendish's plain-code checks, so these numbers show the models on their own.
 
-| Test set | Result |
-|---|---|
-| 20 invented recipe pages | 18 cards right, and 2 wrong because of one misread quantity pattern |
-| 10 real recipe websites | 7 cards correct apart from the title, 1 needing lines tidied, and 2 with a misread quantity |
-| Time per card | About 14 seconds on invented pages, and about 25 seconds on real pages, with the slowest at 60 |
+**Choosing a model**
 
-The sets are small and most results were checked by a script, so this is a regression check rather than a benchmark. Social media screenshots and photos of cookbooks haven't been measured yet. The 20 invented cases are included in the tests.
+Each model was tested on the same 20 invented recipe pages, including two images with no recipe.
+
+| Model | Right | Wrong | Typical time per card | Extra download |
+|---|---|---|---|---|
+| `llama3.2` | 15 | 4 | About 6 seconds | 2 GB |
+| Apple's on-device model | 16 | 4 | About 4 seconds | None |
+| `qwen3.5:9b` | 18 | 2 | About 14 seconds | 7.6 GB |
+| `gemma4:12b` | 19 | 1 | About 15 seconds | 7.7 GB |
+
+`qwen3.5:9b` and Apple's model were then tested on 10 real recipe websites, with each flagged card checked by hand. `gemma4:12b` wasn't part of this test.
+
+| Result on real pages | `qwen3.5:9b` | Apple's on-device model |
+|---|---|---|
+| Correct apart from the title | 7 | 4 |
+| Wrong times or servings | 0 | 4 |
+| Whole ingredient section dropped | 0 | 1 |
+| Typical time per card | About 25 seconds | About 6 seconds |
+| Slowest card | 60 seconds | 14 seconds |
+
+**Why `qwen3.5:9b`**
+
+It made fewer factual mistakes than Apple's model on real pages, and it gave identical cards across repeat runs. `gemma4:12b` scored one card higher, but only through an inconsistent guess, and it used more memory. Apple's model is much faster and needs no setup, which makes it a strong option for the future, but it needs Apple Intelligence turned on and it filled in wrong details more often.
+
+**The whole pipeline**
+
+A final run put all 30 test recipes through text recognition, `qwen3.5:9b` and the card checks. Both images with no recipe were rejected, every misread `1 1/2` was flagged, website logos were kept out of titles, and no ingredient was wrongly reported as missing.
+
+**Limits of these tests**
+
+The sets are small, and the invented pages are cleaner than real screenshots. Most results on invented pages were scored by a script. Social media screenshots from real apps, photos of cookbooks and handwritten recipes haven't been measured yet. The 20 invented cases are included in the tests.
 
 ## License
 
