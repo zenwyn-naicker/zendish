@@ -69,6 +69,14 @@ public struct Recipe: Identifiable, Equatable, Sendable {
     }
 }
 
+public extension Recipe {
+    /// Servings ready to show. Cards may hold just a number, which means nothing on its own.
+    var servingsText: String? {
+        guard let servings else { return nil }
+        return servings.contains(/^[\d\s\-–]+$/) ? "Serves \(servings)" : servings
+    }
+}
+
 /// One ingredient line, with the sub-heading it sits under, such as "For the sauce".
 public struct Ingredient: Equatable, Sendable {
     public var text: String

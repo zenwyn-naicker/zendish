@@ -201,3 +201,72 @@ import Testing
         #expect(loaded.flags.isEmpty)
     }
 }
+
+@Suite struct RecipeSearchTests {
+    private func store() async throws -> (RecipeStore, Recipe, Recipe) {
+        let store = try RecipeStore()
+        let soup = Recipe(title: "Crème de tomate", ingredients: [Ingredient(text: "2 ripe tomatoes"), Ingredient(text: "1 tsp basil")])
+        let cake = Recipe(title: "Lemon Cake", ingredients: [Ingredient(text: "200 g flour")])
+        try await store.save(soup)
+        try await store.save(cake)
+        return (store, soup, cake)
+    }
+
+    @Test func findsByDishOrIngredient() async throws {
+        let (store, soup, cake) = try await store()
+        #expect(try await store.searchRecipeIDs(matching: "lemon") == [cake.id])
+        #expect(try await store.searchRecipeIDs(matching: "basil") == [soup.id])
+    }
+
+    @Test func partialWordsAccentsAndCaseAllMatch() async throws {
+        let (store, soup, _) = try await store()
+        #expect(try await store.searchRecipeIDs(matching: "TOM") == [soup.id])
+        #expect(try await store.searchRecipeIDs(matching: "creme") == [soup.id])
+    }
+
+    @Test func everyWordMustMatch() async throws {
+        let (store, soup, _) = try await store()
+        #expect(try await store.searchRecipeIDs(matching: "tomato basil") == [soup.id])
+        #expect(try await store.searchRecipeIDs(matching: "tomato flour").isEmpty)
+    }
+
+    @Test func oddSearchTextNeverFails() async throws {
+        let (store, _, _) = try await store()
+        for text in ["\"", "AND OR NOT", "a*b", "(", "'; DROP TABLE recipes;--", "   "] {
+            _ = try await store.searchRecipeIDs(matching: text)
+        }
+        #expect(try await store.recipes().count == 2)
+    }
+
+    @Test func editsAndDeletesUpdateSearch() async throws {
+        let (store, soup, cake) = try await store()
+        var renamed = cake
+        renamed.title = "Orange Cake"
+        try await store.save(renamed)
+        #expect(try await store.searchRecipeIDs(matching: "lemon").isEmpty)
+        #expect(try await store.searchRecipeIDs(matching: "orange") == [cake.id])
+
+        try await store.deleteRecipe(id: soup.id)
+        #expect(try await store.searchRecipeIDs(matching: "basil").isEmpty)
+    }
+
+    @Test func aLargeCookbookStaysFast() async throws {
+        let store = try RecipeStore()
+        for number in 0..<1000 {
+            let ingredients = (0..<12).map { Ingredient(text: "\($0 + 1) cups ingredient\(number)x\($0)") }
+            try await store.save(Recipe(title: "Recipe \(number)", ingredients: ingredients, steps: Array(repeating: "Stir the pot well.", count: 8), status: .saved))
+        }
+        let clock = ContinuousClock()
+        var started = clock.now
+        let loaded = try await store.recipes()
+        let loading = clock.now - started
+        started = clock.now
+        let found = try await store.searchRecipeIDs(matching: "ingredient500x3")
+        let searching = clock.now - started
+        #expect(loaded.count == 1000)
+        #expect(found.count == 1)
+        print("PERF load 1000: \(loading), search: \(searching)")
+        #expect(loading < .seconds(1))
+        #expect(searching < .milliseconds(50))
+    }
+}

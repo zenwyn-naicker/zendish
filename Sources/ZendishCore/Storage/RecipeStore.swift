@@ -72,6 +72,11 @@ public actor RecipeStore {
                     [.text(id), .integer(position), .text(name)]
                 )
             }
+            try database.execute("DELETE FROM recipe_search WHERE recipe_id = ?", [.text(id)])
+            try database.execute(
+                "INSERT INTO recipe_search (recipe_id, title, ingredients) VALUES (?, ?, ?)",
+                [.text(id), .text(recipe.title ?? ""), .text(recipe.ingredients.map(\.text).joined(separator: " "))]
+            )
         }
     }
 
@@ -96,7 +101,22 @@ public actor RecipeStore {
     }
 
     public func deleteRecipe(id: UUID) throws {
-        try database.execute("DELETE FROM recipes WHERE id = ?", [.text(id.uuidString)])
+        try database.transaction {
+            try database.execute("DELETE FROM recipe_search WHERE recipe_id = ?", [.text(id.uuidString)])
+            try database.execute("DELETE FROM recipes WHERE id = ?", [.text(id.uuidString)])
+        }
+    }
+
+    /// Finds recipes by dish or ingredient. Each word must match, and "tom" finds "tomato".
+    public func searchRecipeIDs(matching text: String) throws -> Set<UUID> {
+        let words = text.split(whereSeparator: \.isWhitespace)
+            .map { "\"\($0.replacingOccurrences(of: "\"", with: "\"\""))\"*" }
+        guard !words.isEmpty else { return [] }
+        let ids = try database.query(
+            "SELECT recipe_id FROM recipe_search WHERE recipe_search MATCH ?",
+            [.text(words.joined(separator: " "))]
+        ) { $0.text(0) }
+        return Set(ids.compactMap { $0.flatMap(UUID.init(uuidString:)) })
     }
 
     // MARK: Collections
@@ -125,6 +145,18 @@ public actor RecipeStore {
     /// Deletes the collection. Its recipes are kept.
     public func deleteCollection(id: UUID) throws {
         try database.execute("DELETE FROM collections WHERE id = ?", [.text(id.uuidString)])
+    }
+
+    /// Which recipes are in each collection, for showing counts and filtering.
+    public func collectionMembers() throws -> [UUID: Set<UUID>] {
+        let pairs = try database.query("SELECT collection_id, recipe_id FROM collection_recipes") { ($0.text(0), $0.text(1)) }
+        var members: [UUID: Set<UUID>] = [:]
+        for (collection, recipe) in pairs {
+            guard let collection = collection.flatMap(UUID.init(uuidString:)),
+                  let recipe = recipe.flatMap(UUID.init(uuidString:)) else { continue }
+            members[collection, default: []].insert(recipe)
+        }
+        return members
     }
 
     public func add(recipeID: UUID, to collection: RecipeCollection) throws {
@@ -191,7 +223,7 @@ public actor RecipeStore {
 
     // MARK: Schema
 
-    private static let currentVersion = 2
+    private static let currentVersion = 3
 
     /// Each version's changes run once, in order, so existing cookbooks are upgraded in place.
     private static func migrate(_ database: Database) throws {
@@ -206,6 +238,26 @@ public actor RecipeStore {
                     try database.execute("ALTER TABLE recipes ADD COLUMN \(column) TEXT")
                 }
                 try database.execute("PRAGMA user_version = 2")
+            }
+        }
+        if version < 3 {
+            try database.transaction {
+                try database.execute(
+                    """
+                    CREATE VIRTUAL TABLE recipe_search USING fts5(
+                        recipe_id UNINDEXED, title, ingredients, tokenize = 'unicode61 remove_diacritics 2'
+                    )
+                    """
+                )
+                try database.execute(
+                    """
+                    INSERT INTO recipe_search (recipe_id, title, ingredients)
+                    SELECT id, coalesce(title, ''),
+                        coalesce((SELECT group_concat(text, ' ') FROM ingredients WHERE recipe_id = recipes.id), '')
+                    FROM recipes
+                    """
+                )
+                try database.execute("PRAGMA user_version = 3")
             }
         }
     }

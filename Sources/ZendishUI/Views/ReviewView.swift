@@ -6,6 +6,10 @@ struct ReviewView: View {
     let model: AppModel
     @State private var draft: Recipe
     @State private var isConfirmingDiscard = false
+    @State private var isChoosingPhoto = false
+    /// Set once the card has been saved, discarded or sent back to be read, so leaving the
+    /// screen doesn't write older edits over the result.
+    @State private var isFinished = false
 
     init(model: AppModel, recipe: Recipe) {
         self.model = model
@@ -23,6 +27,7 @@ struct ReviewView: View {
                         .font(.title2.weight(.semibold))
                         .textFieldStyle(.plain)
                     details
+                    photo
                     ingredients
                     steps
                 }
@@ -32,6 +37,15 @@ struct ReviewView: View {
             .frame(minWidth: 380, maxWidth: .infinity)
         }
         .navigationTitle(draft.status == .saved ? "Edit Recipe" : "Check This Recipe")
+        .sheet(isPresented: $isChoosingPhoto) {
+            CropSheet(library: model.library, names: draft.imageNames) { name, crop in
+                do {
+                    draft.coverName = try model.chooseCover(for: draft, from: name, crop: crop)
+                } catch {
+                    model.message = String(describing: error)
+                }
+            }
+        }
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 Button("Back", systemImage: "chevron.left") { closeKeepingEdits() }
@@ -41,21 +55,34 @@ struct ReviewView: View {
                     .help("Delete this recipe and its images")
             }
             ToolbarItem(placement: .primaryAction) {
-                Button("Save to Cookbook") { model.saveToCookbook(draft) }
-                    .buttonStyle(.borderedProminent)
+                Button(draft.status == .saved ? "Save Changes" : "Save to Cookbook") {
+                    isFinished = true
+                    model.saveToCookbook(draft)
+                }
+                    .buttonStyle(PrimaryButtonStyle())
                     .keyboardShortcut("s")
             }
         }
         .confirmationDialog("Delete this recipe?", isPresented: $isConfirmingDiscard) {
-            Button("Delete", role: .destructive) { model.delete(draft) }
+            Button("Delete", role: .destructive) {
+                isFinished = true
+                model.delete(draft)
+            }
         } message: {
             Text("The card and its images will be removed from Zendish. This can't be undone.")
+        }
+        // Moving elsewhere in the sidebar also closes this screen, so edits are always kept.
+        .onDisappear {
+            if !isFinished { model.update(draft) }
         }
     }
 
     private func closeKeepingEdits() {
-        model.update(draft)
-        model.openRecipeID = nil
+        if draft.status == .saved {
+            model.isEditing = false
+        } else {
+            model.openRecipeID = nil
+        }
     }
 
     // MARK: Sections
@@ -64,6 +91,7 @@ struct ReviewView: View {
         if let problem = draft.problem {
             Banner(systemImage: "exclamationmark.triangle", text: problem) {
                 Button("Try Again") {
+                    isFinished = true
                     model.retry(draft)
                     model.openRecipeID = nil
                 }
@@ -72,6 +100,22 @@ struct ReviewView: View {
         if draft.flags.contains(.noRecipe) {
             Banner(systemImage: "questionmark.circle", text: "No recipe was found in these images. You can type it in, or discard it.") {
                 EmptyView()
+            }
+        }
+    }
+
+    private var photo: some View {
+        HStack(spacing: 12) {
+            if let cover = draft.coverName {
+                LibraryImage(library: model.library, name: cover, maxPixels: 200)
+                    .frame(width: 64, height: 48)
+                    .clipShape(.rect(cornerRadius: 6))
+            }
+            Button(draft.coverName == nil ? "Choose Card Photo…" : "Change Photo…") { isChoosingPhoto = true }
+            if draft.coverName != nil {
+                Button("Remove Photo") { draft.coverName = nil }
+                    .buttonStyle(.link)
+                    .foregroundStyle(Theme.accent)
             }
         }
     }
@@ -94,7 +138,7 @@ struct ReviewView: View {
     }
 
     private func detailField(_ path: WritableKeyPath<Recipe, String?>) -> some View {
-        TextField("", text: text(path), prompt: Text("Not given"))
+        TextField("", text: text(path), prompt: Text("–"))
             .textFieldStyle(.roundedBorder)
     }
 
@@ -126,6 +170,7 @@ struct ReviewView: View {
             }
             Button("Add Ingredient", systemImage: "plus") { draft.ingredients.append(Ingredient(text: "")) }
                 .buttonStyle(.borderless)
+                .foregroundStyle(Theme.accent)
         }
     }
 
@@ -135,7 +180,7 @@ struct ReviewView: View {
             ForEach(draft.steps.indices, id: \.self) { index in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text("\(index + 1).")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .monospacedDigit()
                     EditableRow(text: $draft.steps[index], placeholder: "Step", isFlagged: false) {
                         draft.steps.remove(at: index)
@@ -144,6 +189,7 @@ struct ReviewView: View {
             }
             Button("Add Step", systemImage: "plus") { draft.steps.append("") }
                 .buttonStyle(.borderless)
+                .foregroundStyle(Theme.accent)
         }
     }
 
@@ -180,7 +226,7 @@ private struct Label2: View {
     init(_ title: String) { self.title = title }
 
     var body: some View {
-        Text(title).font(.caption).foregroundStyle(.secondary)
+        Text(title).font(.caption).foregroundStyle(Theme.muted)
     }
 }
 
@@ -189,7 +235,7 @@ private struct SectionTitle: View {
     init(_ title: String) { self.title = title }
 
     var body: some View {
-        Text(title).font(.headline)
+        Text(title).font(.headline).foregroundStyle(Theme.accent)
     }
 }
 
@@ -206,7 +252,8 @@ private struct EditableRow: View {
                 .textFieldStyle(.plain)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 5)
-                .background(isFlagged ? AnyShapeStyle(Color.orange.opacity(0.14)) : AnyShapeStyle(.quaternary.opacity(0.4)), in: .rect(cornerRadius: 6))
+                .background(isFlagged ? Theme.flagFill : Theme.surface, in: .rect(cornerRadius: 7))
+                .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(isFlagged ? Theme.flag.opacity(0.4) : Theme.line, lineWidth: 0.5))
             Button("Remove", systemImage: "xmark.circle.fill", action: remove)
                 .labelStyle(.iconOnly)
                 .buttonStyle(.borderless)
@@ -222,15 +269,21 @@ private struct QuantityFlagView: View {
     let use: () -> Void
     let keep: () -> Void
 
+    /// Only the quantity, since that's the part in question.
+    private var shortSuggestion: String {
+        suggestion.split(separator: " ").prefix(3).joined(separator: " ")
+    }
+
     var body: some View {
         HStack(spacing: 10) {
-            Text("Should this be “\(suggestion)”?")
-                .foregroundStyle(.orange)
+            Text("Should this be “\(shortSuggestion)”?")
+                .foregroundStyle(Theme.flag)
             Button("Use This", action: use)
             Button("Keep As Is", action: keep)
         }
         .font(.callout)
         .buttonStyle(.link)
+        .foregroundStyle(Theme.accent)
         .padding(.leading, 8)
     }
 }
@@ -243,12 +296,13 @@ private struct MissingLineView: View {
     var body: some View {
         HStack(spacing: 10) {
             Text("In the image, not on the card: \(line)")
-                .foregroundStyle(.orange)
+                .foregroundStyle(Theme.flag)
             Button("Add", action: add)
             Button("Ignore", action: ignore)
         }
         .font(.callout)
         .buttonStyle(.link)
+        .foregroundStyle(Theme.accent)
         .padding(.leading, 8)
     }
 }
@@ -260,13 +314,13 @@ private struct Banner<Action: View>: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: systemImage).foregroundStyle(.orange)
+            Image(systemName: systemImage).foregroundStyle(Theme.flag)
             Text(text).fixedSize(horizontal: false, vertical: true)
             Spacer()
             action()
         }
         .padding(12)
-        .background(Color.orange.opacity(0.1), in: .rect(cornerRadius: 8))
+        .background(Theme.flagFill, in: .rect(cornerRadius: 8))
     }
 }
 
@@ -285,8 +339,19 @@ struct OriginalImagesView: View {
             }
             .padding(14)
         }
-        .background(.quaternary.opacity(0.35))
+        .background(Theme.sidebar)
     }
+}
+
+/// Keeps recently shown images in memory, so scrolling back through a grid is instant.
+final class ImageCache: @unchecked Sendable {
+    static let shared = ImageCache()
+    private let storage = NSCache<NSString, CGImage>()
+
+    private init() { storage.countLimit = 300 }
+
+    func image(for key: String) -> CGImage? { storage.object(forKey: key as NSString) }
+    func store(_ image: CGImage, for key: String) { storage.setObject(image, forKey: key as NSString) }
 }
 
 /// Loads a downscaled copy away from the main thread, so scrolling stays smooth.
@@ -294,23 +359,36 @@ struct LibraryImage: View {
     let library: ImageLibrary
     let name: String
     let maxPixels: Int
+    var fill = false
     @State private var image: CGImage?
 
     var body: some View {
         Group {
             if let image {
-                Image(decorative: image, scale: 1)
-                    .resizable()
-                    .scaledToFit()
+                if fill {
+                    Color.clear.overlay {
+                        Image(decorative: image, scale: 1).resizable().scaledToFill()
+                    }
+                    .clipped()
+                } else {
+                    Image(decorative: image, scale: 1).resizable().scaledToFit()
+                }
             } else {
                 Color.secondary.opacity(0.1).frame(minHeight: 120)
             }
         }
         .task(id: name) {
+            let key = "\(name)-\(maxPixels)"
+            if let cached = ImageCache.shared.image(for: key) {
+                image = cached
+                return
+            }
             let library = library, name = name, maxPixels = maxPixels
-            image = await Task.detached(priority: .userInitiated) {
+            let loaded = await Task.detached(priority: .userInitiated) {
                 library.thumbnail(named: name, maxPixels: maxPixels)
             }.value
+            if let loaded { ImageCache.shared.store(loaded, for: key) }
+            image = loaded
         }
     }
 }

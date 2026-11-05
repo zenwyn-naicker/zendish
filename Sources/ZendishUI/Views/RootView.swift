@@ -15,16 +15,31 @@ public struct RootView: View {
             SidebarView(model: model)
                 .navigationSplitViewColumnWidth(min: 190, ideal: 210, max: 280)
         } detail: {
-            if let recipe = model.recipe(id: model.openRecipeID) {
-                ReviewView(model: model, recipe: recipe).id(recipe.id)
-            } else {
-                CookbookView(model: model)
+            Group {
+                if let recipe = model.recipe(id: model.openRecipeID) {
+                    if recipe.status == .saved, !model.isEditing {
+                        RecipeView(model: model, recipe: recipe)
+                    } else {
+                        ReviewView(model: model, recipe: recipe).id(recipe.id)
+                    }
+                } else {
+                    CookbookView(model: model)
+                }
             }
+            .safeAreaInset(edge: .top, spacing: 0) { SetupBar(model: model) }
+            .background(Theme.page)
+            .foregroundStyle(Theme.text)
+            .toolbarBackground(Theme.page, for: .windowToolbar)
         }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button("Add Recipe", systemImage: "plus") { model.isChoosingFiles = true }
-                    .help("Add images of a recipe")
+        .tint(Theme.accent)
+        .searchable(text: $model.searchText, placement: .sidebar, prompt: "Dish or ingredient")
+        .task(id: model.searchText) { await model.search() }
+        .onChange(of: model.searchText) { model.openRecipeID = nil }
+        .task {
+            // Notices when Ollama is opened or the model arrives, without needing a click.
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(4))
+                if model.setup != .ready { await model.checkSetup() }
             }
         }
         .dropDestination(for: URL.self) { urls, _ in
@@ -34,7 +49,7 @@ public struct RootView: View {
         .overlay {
             if isDropTargeted {
                 RoundedRectangle(cornerRadius: 10)
-                    .strokeBorder(Color.accentColor, lineWidth: 3)
+                    .strokeBorder(Theme.accent, lineWidth: 3)
                     .padding(6)
                     .allowsHitTesting(false)
             }
@@ -71,63 +86,3 @@ public struct RootView: View {
     }
 }
 
-struct SidebarView: View {
-    @Bindable var model: AppModel
-
-    var body: some View {
-        List(selection: $model.selection) {
-            Label("All Recipes", systemImage: "book").tag(SidebarItem.all)
-            Label("To Review", systemImage: "checklist")
-                .badge(model.reviewQueue.count)
-                .tag(SidebarItem.toReview)
-        }
-    }
-}
-
-struct CookbookView: View {
-    @Bindable var model: AppModel
-
-    private let columns = [GridItem(.adaptive(minimum: 190, maximum: 260), spacing: 16)]
-
-    var body: some View {
-        Group {
-            if model.shownRecipes.isEmpty {
-                ContentUnavailableView {
-                    Label(emptyTitle, systemImage: "photo.on.rectangle")
-                } description: {
-                    Text(emptyDetail)
-                } actions: {
-                    Button("Choose Images") { model.isChoosingFiles = true }
-                }
-            } else {
-                ScrollView {
-                    LazyVGrid(columns: columns, spacing: 16) {
-                        ForEach(model.shownRecipes) { recipe in
-                            Button {
-                                model.openRecipeID = recipe.id
-                            } label: {
-                                Text(recipe.status == .reading ? "Reading…" : recipe.title ?? "Untitled recipe")
-                                    .frame(maxWidth: .infinity, minHeight: 80)
-                                    .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 10))
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(recipe.status == .reading)
-                        }
-                    }
-                    .padding(20)
-                }
-            }
-        }
-        .navigationTitle(model.selection == .all ? "All Recipes" : "To Review")
-    }
-
-    private var emptyTitle: String {
-        model.selection == .all ? "Start your cookbook" : "Nothing to review"
-    }
-
-    private var emptyDetail: String {
-        model.selection == .all
-            ? "Drop recipe screenshots anywhere in this window, or choose them from your Mac."
-            : "New recipes appear here so you can check them before saving."
-    }
-}
