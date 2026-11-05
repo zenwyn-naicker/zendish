@@ -276,21 +276,42 @@ func writeRecipeImage(_ lines: [String], to url: URL) throws {
     }
 }
 
-@Suite struct CropBoxTests {
-    private let size = CGSize(width: 200, height: 100)
+@MainActor @Suite(.serialized) struct RecipePhotoTests {
+    @Test func aChosenPhotoIsCopiedAndReplacesTheOldOne() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let model = AppModel(
+            store: try RecipeStore(),
+            library: try ImageLibrary(folder: folder.appendingPathComponent("Images")),
+            maker: CardMaker(reader: StubReader(), writer: StubWriter())
+        )
+        let first = folder.appendingPathComponent("first.png")
+        let second = folder.appendingPathComponent("second.jpg")
+        try writeRecipeImage(["Soup"], to: first)
+        try writeRecipeImage(["Soup"], to: second)
 
-    @Test func aDragBecomesFractions() {
-        let box = cropBox(from: CGPoint(x: 20, y: 10), to: CGPoint(x: 120, y: 60), in: size)
-        #expect(box == CGRect(x: 0.1, y: 0.1, width: 0.5, height: 0.5))
+        let firstName = try model.choosePhoto(from: first, replacing: nil)
+        #expect(FileManager.default.fileExists(atPath: model.library.url(for: firstName).path))
+
+        let secondName = try model.choosePhoto(from: second, replacing: firstName)
+        #expect(FileManager.default.fileExists(atPath: model.library.url(for: secondName).path))
+        #expect(!FileManager.default.fileExists(atPath: model.library.url(for: firstName).path))
     }
 
-    @Test func draggingUpAndLeftWorks() {
-        let box = cropBox(from: CGPoint(x: 120, y: 60), to: CGPoint(x: 20, y: 10), in: size)
-        #expect(box == CGRect(x: 0.1, y: 0.1, width: 0.5, height: 0.5))
-    }
-
-    @Test func aDragPastTheEdgeStaysInsideTheImage() {
-        let box = cropBox(from: CGPoint(x: 100, y: 50), to: CGPoint(x: 400, y: 300), in: size)
-        #expect(box == CGRect(x: 0.5, y: 0.5, width: 0.5, height: 0.5))
+    @Test func aFileThatIsNotAPhotoIsRefused() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let model = AppModel(
+            store: try RecipeStore(),
+            library: try ImageLibrary(folder: folder.appendingPathComponent("Images")),
+            maker: CardMaker(reader: StubReader(), writer: StubWriter())
+        )
+        let notes = folder.appendingPathComponent("notes.txt")
+        try Data("hello".utf8).write(to: notes)
+        #expect(throws: ImageLibraryError.notAnImage("notes.txt")) {
+            _ = try model.choosePhoto(from: notes, replacing: nil)
+        }
     }
 }

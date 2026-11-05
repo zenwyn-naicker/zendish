@@ -43,25 +43,6 @@ public struct ImageLibrary: Sendable {
         return name
     }
 
-    /// Saves a cropped area of a stored image as a new JPEG. The crop uses 0-to-1 fractions of
-    /// the image, measured from the top left.
-    public func cropCover(from name: String, to crop: CGRect) throws -> String {
-        guard let image = Self.image(at: url(for: name), maxPixels: nil) else {
-            throw ImageLibraryError.unreadable(name)
-        }
-        let width = CGFloat(image.width), height = CGFloat(image.height)
-        let area = CGRect(x: crop.minX * width, y: crop.minY * height, width: crop.width * width, height: crop.height * height).integral
-        guard let cropped = image.cropping(to: area) else { throw ImageLibraryError.unreadable(name) }
-
-        let coverName = "cover-\(UUID().uuidString).jpg"
-        guard let writer = CGImageDestinationCreateWithURL(url(for: coverName) as CFURL, UTType.jpeg.identifier as CFString, 1, nil) else {
-            throw ImageLibraryError.unreadable(name)
-        }
-        CGImageDestinationAddImage(writer, cropped, [kCGImageDestinationLossyCompressionQuality: 0.85] as CFDictionary)
-        guard CGImageDestinationFinalize(writer) else { throw ImageLibraryError.unreadable(name) }
-        return coverName
-    }
-
     public func remove(_ names: [String]) {
         for name in names { try? FileManager.default.removeItem(at: url(for: name)) }
     }
@@ -76,12 +57,8 @@ public struct ImageLibrary: Sendable {
         return type.conforms(to: .image)
     }
 
-    private static func image(at url: URL, maxPixels: Int?) -> CGImage? {
+    private static func image(at url: URL, maxPixels: Int) -> CGImage? {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
-        guard let maxPixels else {
-            let options = [kCGImageSourceShouldCache: false] as CFDictionary
-            return CGImageSourceCreateImageAtIndex(source, 0, options)
-        }
         let options: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,

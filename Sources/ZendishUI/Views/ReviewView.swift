@@ -42,14 +42,8 @@ struct ReviewView: View {
             .frame(minWidth: 380, maxWidth: .infinity)
         }
         .navigationTitle(draft.status == .saved ? "Edit Recipe" : "Check This Recipe")
-        .sheet(isPresented: $isChoosingPhoto) {
-            CropSheet(library: model.library, names: draft.imageNames) { name, crop in
-                do {
-                    draft.coverName = try model.chooseCover(for: draft, from: name, crop: crop)
-                } catch {
-                    model.message = String(describing: error)
-                }
-            }
+        .fileImporter(isPresented: $isChoosingPhoto, allowedContentTypes: [.image]) { result in
+            if case .success(let url) = result { usePhoto(url) }
         }
         .toolbar {
             ToolbarItem(placement: .navigation) {
@@ -111,17 +105,45 @@ struct ReviewView: View {
 
     private var photo: some View {
         HStack(spacing: 12) {
-            if let cover = draft.coverName {
-                LibraryImage(library: model.library, name: cover, maxPixels: 200)
-                    .frame(width: 64, height: 48)
-                    .clipShape(.rect(cornerRadius: 6))
+            Group {
+                if let cover = draft.coverName {
+                    LibraryImage(library: model.library, name: cover, maxPixels: 300, fill: true)
+                } else {
+                    Theme.tile.overlay {
+                        Image(systemName: "photo")
+                            .foregroundStyle(Theme.accent.opacity(0.6))
+                    }
+                }
             }
-            Button(draft.coverName == nil ? "Choose Card Photo…" : "Change Photo…") { isChoosingPhoto = true }
-            if draft.coverName != nil {
-                Button("Remove Photo") { draft.coverName = nil }
+            .frame(width: 88, height: 66)
+            .clipShape(.rect(cornerRadius: 8))
+            VStack(alignment: .leading, spacing: 4) {
+                Button(draft.coverName == nil ? "Choose Photo…" : "Change Photo…") { isChoosingPhoto = true }
+                if draft.coverName != nil {
+                    Button("Remove Photo") {
+                        if let cover = draft.coverName { model.library.remove([cover]) }
+                        draft.coverName = nil
+                    }
                     .buttonStyle(.link)
                     .foregroundStyle(Theme.accent)
+                } else {
+                    Text("Or drag one here").font(.caption).foregroundStyle(Theme.muted)
+                }
             }
+        }
+        .contentShape(.rect)
+        .dropDestination(for: URL.self) { urls, _ in
+            guard let url = urls.first else { return false }
+            usePhoto(url)
+            return true
+        }
+    }
+
+    private func usePhoto(_ url: URL) {
+        do {
+            draft.coverName = try model.choosePhoto(from: url, replacing: draft.coverName)
+        } catch {
+            model.message = String(describing: error)
         }
     }
 
