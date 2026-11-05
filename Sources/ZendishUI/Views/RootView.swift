@@ -27,7 +27,11 @@ public struct RootView: View {
                 }
             }
             .safeAreaInset(edge: .top, spacing: 0) { SetupBar(model: model) }
+            .background(Theme.page)
+            .foregroundStyle(Theme.text)
+            .toolbarBackground(Theme.page, for: .windowToolbar)
         }
+        .tint(Theme.accent)
         .searchable(text: $model.searchText, placement: .sidebar, prompt: "Dish or ingredient")
         .task(id: model.searchText) { await model.search() }
         .onChange(of: model.searchText) { model.openRecipeID = nil }
@@ -45,7 +49,7 @@ public struct RootView: View {
         .overlay {
             if isDropTargeted {
                 RoundedRectangle(cornerRadius: 10)
-                    .strokeBorder(Color.accentColor, lineWidth: 3)
+                    .strokeBorder(Theme.accent, lineWidth: 3)
                     .padding(6)
                     .allowsHitTesting(false)
             }
