@@ -27,21 +27,27 @@ public actor RecipeStore {
     /// Adds the recipe, or replaces the saved one with the same ID.
     public func save(_ recipe: Recipe) throws {
         let id = recipe.id.uuidString
+        let flagText = String(decoding: try JSONEncoder().encode(recipe.flags), as: UTF8.self)
         try database.transaction {
             try database.execute(
                 """
-                INSERT INTO recipes (id, title, total_time, prep_time, cook_time, servings, status, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO recipes (
+                    id, title, total_time, prep_time, cook_time, servings, status, created_at, updated_at,
+                    cover_name, flags, source_text, problem
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (id) DO UPDATE SET
                     title = excluded.title, total_time = excluded.total_time,
                     prep_time = excluded.prep_time, cook_time = excluded.cook_time,
                     servings = excluded.servings, status = excluded.status,
-                    updated_at = excluded.updated_at
+                    updated_at = excluded.updated_at, cover_name = excluded.cover_name,
+                    flags = excluded.flags, source_text = excluded.source_text, problem = excluded.problem
                 """,
                 [
                     .text(id), .text(recipe.title), .text(recipe.totalTime), .text(recipe.prepTime),
                     .text(recipe.cookTime), .text(recipe.servings), .text(recipe.status.rawValue),
                     .real(recipe.createdAt.timeIntervalSince1970), .real(recipe.updatedAt.timeIntervalSince1970),
+                    .text(recipe.coverName), .text(flagText), .text(recipe.sourceText), .text(recipe.problem),
                 ]
             )
 
@@ -140,14 +146,16 @@ public actor RecipeStore {
     private func loadRecipes(where condition: String = "1", _ values: [SQLValue] = []) throws -> [Recipe] {
         let rows = try database.query(
             """
-            SELECT id, title, total_time, prep_time, cook_time, servings, status, created_at, updated_at
+            SELECT id, title, total_time, prep_time, cook_time, servings, status, created_at, updated_at,
+                cover_name, flags, source_text, problem
             FROM recipes WHERE \(condition) ORDER BY updated_at DESC
             """,
             values
         ) { row in
             (
                 id: row.text(0), title: row.text(1), total: row.text(2), prep: row.text(3), cook: row.text(4),
-                servings: row.text(5), status: row.text(6), created: row.real(7), updated: row.real(8)
+                servings: row.text(5), status: row.text(6), created: row.real(7), updated: row.real(8),
+                cover: row.text(9), flags: row.text(10), source: row.text(11), problem: row.text(12)
             )
         }
 
@@ -170,7 +178,11 @@ public actor RecipeStore {
                 imageNames: try database.query(
                     "SELECT file_name FROM images WHERE recipe_id = ? ORDER BY position", key
                 ) { $0.text(0) ?? "" },
+                coverName: row.cover,
                 status: row.status.flatMap(Recipe.Status.init(rawValue:)) ?? .needsReview,
+                flags: row.flags.flatMap { try? JSONDecoder().decode([CardFlag].self, from: Data($0.utf8)) } ?? [],
+                sourceText: row.source,
+                problem: row.problem,
                 createdAt: Date(timeIntervalSince1970: row.created),
                 updatedAt: Date(timeIntervalSince1970: row.updated)
             )
@@ -179,16 +191,26 @@ public actor RecipeStore {
 
     // MARK: Schema
 
-    private static let currentVersion = 1
+    private static let currentVersion = 2
 
+    /// Each version's changes run once, in order, so existing cookbooks are upgraded in place.
     private static func migrate(_ database: Database) throws {
         let version = try database.query("PRAGMA user_version") { $0.integer(0) }.first ?? 0
-        guard version < currentVersion else {
-            if version > currentVersion {
-                throw DatabaseError(description: "This cookbook was saved by a newer version of Zendish.")
-            }
-            return
+        if version > currentVersion {
+            throw DatabaseError(description: "This cookbook was saved by a newer version of Zendish.")
         }
+        if version < 1 { try createTables(database) }
+        if version < 2 {
+            try database.transaction {
+                for column in ["cover_name", "flags", "source_text", "problem"] {
+                    try database.execute("ALTER TABLE recipes ADD COLUMN \(column) TEXT")
+                }
+                try database.execute("PRAGMA user_version = 2")
+            }
+        }
+    }
+
+    private static func createTables(_ database: Database) throws {
         try database.transaction {
             try database.execute(
                 """
@@ -256,7 +278,7 @@ public actor RecipeStore {
             )
             try database.execute("CREATE INDEX recipes_by_status ON recipes (status)")
             try database.execute("CREATE INDEX collection_recipes_by_recipe ON collection_recipes (recipe_id)")
-            try database.execute("PRAGMA user_version = \(currentVersion)")
+            try database.execute("PRAGMA user_version = 1")
         }
     }
 }

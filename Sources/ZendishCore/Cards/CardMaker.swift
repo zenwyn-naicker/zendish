@@ -27,7 +27,8 @@ public struct CardMaker: Sendable {
 
     public func makeCard(fromText text: String, imageNames: [String] = []) async throws -> MadeCard {
         guard CardChecks.hasRecipe(in: text) else {
-            return MadeCard(recipe: Recipe(imageNames: imageNames), flags: [], cleared: [], sourceText: text, hasRecipe: false)
+            let recipe = Recipe(imageNames: imageNames, flags: [.noRecipe], sourceText: text)
+            return MadeCard(recipe: recipe, flags: [.noRecipe], cleared: [], sourceText: text, hasRecipe: false)
         }
         let draft = try await writer.writeCard(from: text)
         let checked = CardChecks.check(draft, against: text)
@@ -40,8 +41,10 @@ public struct CardMaker: Sendable {
             prepTime: card.prepTime,
             cookTime: card.cookTime,
             servings: card.servings,
-            imageNames: imageNames
+            imageNames: imageNames,
+            flags: draft.isRecipe ? checked.flags : [.noRecipe],
+            sourceText: text
         )
-        return MadeCard(recipe: recipe, flags: checked.flags, cleared: checked.cleared, sourceText: text, hasRecipe: draft.isRecipe)
+        return MadeCard(recipe: recipe, flags: recipe.flags, cleared: checked.cleared, sourceText: text, hasRecipe: draft.isRecipe)
     }
 }

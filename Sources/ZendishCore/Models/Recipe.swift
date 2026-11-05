@@ -4,6 +4,8 @@ import Foundation
 /// and text is kept exactly as written, including quantities such as "1 ½ cups".
 public struct Recipe: Identifiable, Equatable, Sendable {
     public enum Status: String, Sendable {
+        /// Waiting for, or going through, text recognition and the model.
+        case reading
         case needsReview
         case saved
     }
@@ -18,7 +20,15 @@ public struct Recipe: Identifiable, Equatable, Sendable {
     public var servings: String?
     /// File names of the original images, in reading order.
     public var imageNames: [String]
+    /// File name of the cropped photo shown on the card, if one was chosen.
+    public var coverName: String?
     public var status: Status
+    /// What the card checks want a person to look at.
+    public var flags: [CardFlag]
+    /// The text read from the images, kept so the card can be rebuilt or searched.
+    public var sourceText: String?
+    /// Why the card couldn't be made, in words a person can act on.
+    public var problem: String?
     public var createdAt: Date
     public var updatedAt: Date
 
@@ -32,7 +42,11 @@ public struct Recipe: Identifiable, Equatable, Sendable {
         cookTime: String? = nil,
         servings: String? = nil,
         imageNames: [String] = [],
+        coverName: String? = nil,
         status: Status = .needsReview,
+        flags: [CardFlag] = [],
+        sourceText: String? = nil,
+        problem: String? = nil,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
@@ -45,7 +59,11 @@ public struct Recipe: Identifiable, Equatable, Sendable {
         self.cookTime = cookTime
         self.servings = servings
         self.imageNames = imageNames
+        self.coverName = coverName
         self.status = status
+        self.flags = flags
+        self.sourceText = sourceText
+        self.problem = problem
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }

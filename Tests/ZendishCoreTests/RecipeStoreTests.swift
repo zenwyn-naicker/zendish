@@ -157,3 +157,47 @@ import Testing
         }
     }
 }
+
+@Suite struct RecipeReviewStorageTests {
+    @Test func flagsAndSourceTextAreKept() async throws {
+        let store = try RecipeStore()
+        let recipe = Recipe(
+            coverName: "cover.jpg",
+            status: .reading,
+            flags: [.checkQuantity(line: "11/2 cups", suggestion: "1 1/2 cups"), .missingLine("1 tsp salt"), .noRecipe],
+            sourceText: "Read from the image",
+            problem: "Ollama isn't open."
+        )
+        try await store.save(recipe)
+
+        let loaded = try #require(try await store.recipe(id: recipe.id))
+        #expect(loaded.flags == recipe.flags)
+        #expect(loaded.sourceText == "Read from the image")
+        #expect(loaded.problem == "Ollama isn't open.")
+        #expect(loaded.coverName == "cover.jpg")
+        #expect(loaded.status == .reading)
+    }
+
+    @Test func aVersionOneDatabaseIsUpgradedInPlace() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let url = folder.appendingPathComponent("zendish.sqlite")
+        let id = UUID()
+
+        do {
+            let old = try Database(path: url.path)
+            try old.execute("CREATE TABLE recipes (id TEXT PRIMARY KEY, title TEXT, total_time TEXT, prep_time TEXT, cook_time TEXT, servings TEXT, status TEXT NOT NULL, created_at REAL NOT NULL, updated_at REAL NOT NULL)")
+            try old.execute("CREATE TABLE ingredients (recipe_id TEXT, position INTEGER, text TEXT, section TEXT)")
+            try old.execute("CREATE TABLE steps (recipe_id TEXT, position INTEGER, text TEXT)")
+            try old.execute("CREATE TABLE images (recipe_id TEXT, position INTEGER, file_name TEXT)")
+            try old.execute("INSERT INTO recipes VALUES (?, 'Old soup', NULL, NULL, NULL, NULL, 'saved', 1, 1)", [.text(id.uuidString)])
+            try old.execute("PRAGMA user_version = 1")
+        }
+
+        let store = try RecipeStore(url: url)
+        let loaded = try #require(try await store.recipe(id: id))
+        #expect(loaded.title == "Old soup")
+        #expect(loaded.flags.isEmpty)
+    }
+}
