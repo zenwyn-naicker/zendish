@@ -15,18 +15,21 @@ public struct RootView: View {
             SidebarView(model: model)
                 .navigationSplitViewColumnWidth(min: 190, ideal: 210, max: 280)
         } detail: {
-            if let recipe = model.recipe(id: model.openRecipeID) {
-                ReviewView(model: model, recipe: recipe).id(recipe.id)
-            } else {
-                CookbookView(model: model)
+            Group {
+                if let recipe = model.recipe(id: model.openRecipeID) {
+                    if recipe.status == .saved, !model.isEditing {
+                        RecipeView(model: model, recipe: recipe)
+                    } else {
+                        ReviewView(model: model, recipe: recipe).id(recipe.id)
+                    }
+                } else {
+                    CookbookView(model: model)
+                }
             }
+            .safeAreaInset(edge: .top, spacing: 0) { SetupBar(model: model) }
         }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button("Add Recipe", systemImage: "plus") { model.isChoosingFiles = true }
-                    .help("Add images of a recipe")
-            }
-        }
+        .searchable(text: $model.searchText, placement: .sidebar, prompt: "Dish or ingredient")
+        .task(id: model.searchText) { await model.search() }
         .dropDestination(for: URL.self) { urls, _ in
             model.receive(urls)
             return true
@@ -71,63 +74,3 @@ public struct RootView: View {
     }
 }
 
-struct SidebarView: View {
-    @Bindable var model: AppModel
-
-    var body: some View {
-        List(selection: $model.selection) {
-            Label("All Recipes", systemImage: "book").tag(SidebarItem.all)
-            Label("To Review", systemImage: "checklist")
-                .badge(model.reviewQueue.count)
-                .tag(SidebarItem.toReview)
-        }
-    }
-}
-
-struct CookbookView: View {
-    @Bindable var model: AppModel
-
-    private let columns = [GridItem(.adaptive(minimum: 190, maximum: 260), spacing: 16)]
-
-    var body: some View {
-        Group {
-            if model.shownRecipes.isEmpty {
-                ContentUnavailableView {
-                    Label(emptyTitle, systemImage: "photo.on.rectangle")
-                } description: {
-                    Text(emptyDetail)
-                } actions: {
-                    Button("Choose Images") { model.isChoosingFiles = true }
-                }
-            } else {
-                ScrollView {
-                    LazyVGrid(columns: columns, spacing: 16) {
-                        ForEach(model.shownRecipes) { recipe in
-                            Button {
-                                model.openRecipeID = recipe.id
-                            } label: {
-                                Text(recipe.status == .reading ? "Reading…" : recipe.title ?? "Untitled recipe")
-                                    .frame(maxWidth: .infinity, minHeight: 80)
-                                    .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 10))
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(recipe.status == .reading)
-                        }
-                    }
-                    .padding(20)
-                }
-            }
-        }
-        .navigationTitle(model.selection == .all ? "All Recipes" : "To Review")
-    }
-
-    private var emptyTitle: String {
-        model.selection == .all ? "Start your cookbook" : "Nothing to review"
-    }
-
-    private var emptyDetail: String {
-        model.selection == .all
-            ? "Drop recipe screenshots anywhere in this window, or choose them from your Mac."
-            : "New recipes appear here so you can check them before saving."
-    }
-}

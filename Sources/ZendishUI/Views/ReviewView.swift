@@ -6,6 +6,7 @@ struct ReviewView: View {
     let model: AppModel
     @State private var draft: Recipe
     @State private var isConfirmingDiscard = false
+    @State private var isChoosingPhoto = false
 
     init(model: AppModel, recipe: Recipe) {
         self.model = model
@@ -23,6 +24,7 @@ struct ReviewView: View {
                         .font(.title2.weight(.semibold))
                         .textFieldStyle(.plain)
                     details
+                    photo
                     ingredients
                     steps
                 }
@@ -32,6 +34,15 @@ struct ReviewView: View {
             .frame(minWidth: 380, maxWidth: .infinity)
         }
         .navigationTitle(draft.status == .saved ? "Edit Recipe" : "Check This Recipe")
+        .sheet(isPresented: $isChoosingPhoto) {
+            CropSheet(library: model.library, names: draft.imageNames) { name, crop in
+                do {
+                    draft.coverName = try model.chooseCover(for: draft, from: name, crop: crop)
+                } catch {
+                    model.message = String(describing: error)
+                }
+            }
+        }
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 Button("Back", systemImage: "chevron.left") { closeKeepingEdits() }
@@ -41,7 +52,7 @@ struct ReviewView: View {
                     .help("Delete this recipe and its images")
             }
             ToolbarItem(placement: .primaryAction) {
-                Button("Save to Cookbook") { model.saveToCookbook(draft) }
+                Button(draft.status == .saved ? "Save Changes" : "Save to Cookbook") { model.saveToCookbook(draft) }
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut("s")
             }
@@ -55,7 +66,11 @@ struct ReviewView: View {
 
     private func closeKeepingEdits() {
         model.update(draft)
-        model.openRecipeID = nil
+        if draft.status == .saved {
+            model.isEditing = false
+        } else {
+            model.openRecipeID = nil
+        }
     }
 
     // MARK: Sections
@@ -72,6 +87,21 @@ struct ReviewView: View {
         if draft.flags.contains(.noRecipe) {
             Banner(systemImage: "questionmark.circle", text: "No recipe was found in these images. You can type it in, or discard it.") {
                 EmptyView()
+            }
+        }
+    }
+
+    private var photo: some View {
+        HStack(spacing: 12) {
+            if let cover = draft.coverName {
+                LibraryImage(library: model.library, name: cover, maxPixels: 200)
+                    .frame(width: 64, height: 48)
+                    .clipShape(.rect(cornerRadius: 6))
+            }
+            Button(draft.coverName == nil ? "Choose Card Photo…" : "Change Photo…") { isChoosingPhoto = true }
+            if draft.coverName != nil {
+                Button("Remove Photo") { draft.coverName = nil }
+                    .buttonStyle(.link)
             }
         }
     }
@@ -206,7 +236,7 @@ private struct EditableRow: View {
                 .textFieldStyle(.plain)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 5)
-                .background(isFlagged ? AnyShapeStyle(Color.orange.opacity(0.14)) : AnyShapeStyle(.quaternary.opacity(0.4)), in: .rect(cornerRadius: 6))
+                .background(isFlagged ? AnyShapeStyle(Color.orange.opacity(0.14)) : AnyShapeStyle(.quaternary.opacity(0.22)), in: .rect(cornerRadius: 6))
             Button("Remove", systemImage: "xmark.circle.fill", action: remove)
                 .labelStyle(.iconOnly)
                 .buttonStyle(.borderless)
@@ -222,9 +252,14 @@ private struct QuantityFlagView: View {
     let use: () -> Void
     let keep: () -> Void
 
+    /// Only the quantity, since that's the part in question.
+    private var shortSuggestion: String {
+        suggestion.split(separator: " ").prefix(3).joined(separator: " ")
+    }
+
     var body: some View {
         HStack(spacing: 10) {
-            Text("Should this be “\(suggestion)”?")
+            Text("Should this be “\(shortSuggestion)”?")
                 .foregroundStyle(.orange)
             Button("Use This", action: use)
             Button("Keep As Is", action: keep)
@@ -289,28 +324,52 @@ struct OriginalImagesView: View {
     }
 }
 
+/// Keeps recently shown images in memory, so scrolling back through a grid is instant.
+final class ImageCache: @unchecked Sendable {
+    static let shared = ImageCache()
+    private let storage = NSCache<NSString, CGImage>()
+
+    private init() { storage.countLimit = 300 }
+
+    func image(for key: String) -> CGImage? { storage.object(forKey: key as NSString) }
+    func store(_ image: CGImage, for key: String) { storage.setObject(image, forKey: key as NSString) }
+}
+
 /// Loads a downscaled copy away from the main thread, so scrolling stays smooth.
 struct LibraryImage: View {
     let library: ImageLibrary
     let name: String
     let maxPixels: Int
+    var fill = false
     @State private var image: CGImage?
 
     var body: some View {
         Group {
             if let image {
-                Image(decorative: image, scale: 1)
-                    .resizable()
-                    .scaledToFit()
+                if fill {
+                    Color.clear.overlay {
+                        Image(decorative: image, scale: 1).resizable().scaledToFill()
+                    }
+                    .clipped()
+                } else {
+                    Image(decorative: image, scale: 1).resizable().scaledToFit()
+                }
             } else {
                 Color.secondary.opacity(0.1).frame(minHeight: 120)
             }
         }
         .task(id: name) {
+            let key = "\(name)-\(maxPixels)"
+            if let cached = ImageCache.shared.image(for: key) {
+                image = cached
+                return
+            }
             let library = library, name = name, maxPixels = maxPixels
-            image = await Task.detached(priority: .userInitiated) {
+            let loaded = await Task.detached(priority: .userInitiated) {
                 library.thumbnail(named: name, maxPixels: maxPixels)
             }.value
+            if let loaded { ImageCache.shared.store(loaded, for: key) }
+            image = loaded
         }
     }
 }

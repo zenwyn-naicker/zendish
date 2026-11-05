@@ -146,3 +146,76 @@ func writeRecipeImage(_ lines: [String], to url: URL) throws {
         #expect(!FileManager.default.fileExists(atPath: stored.path))
     }
 }
+
+@MainActor @Suite(.serialized) struct LibraryTests {
+    private func model(with titles: [String]) async throws -> AppModel {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let store = try RecipeStore()
+        for title in titles {
+            try await store.save(Recipe(title: title, ingredients: [Ingredient(text: "1 cup \(title) stock")], status: .saved))
+        }
+        let model = AppModel(store: store, library: try ImageLibrary(folder: folder), maker: CardMaker(writer: StubWriter()))
+        try await waitUntil { model.recipes.count == titles.count }
+        return model
+    }
+
+    @Test func searchNarrowsTheListAndClearing_restoresIt() async throws {
+        let model = try await model(with: ["Tomato", "Lentil"])
+        model.searchText = "tom"
+        await model.search()
+        #expect(model.shownRecipes.map(\.title) == ["Tomato"])
+
+        model.searchText = ""
+        await model.search()
+        #expect(model.shownRecipes.count == 2)
+    }
+
+    @Test func collectionsFilterAndCount() async throws {
+        let model = try await model(with: ["Tomato", "Lentil"])
+        model.addCollection(named: "  Soups ")
+        try await waitUntil { model.collections.count == 1 }
+        let soups = try #require(model.collections.first)
+        #expect(soups.name == "Soups")
+
+        let tomato = try #require(model.recipes.first { $0.title == "Tomato" })
+        model.setRecipe(tomato.id, in: soups, to: true)
+        try await waitUntil { model.members[soups.id]?.count == 1 }
+
+        model.selection = .collection(soups.id)
+        #expect(model.shownRecipes.map(\.title) == ["Tomato"])
+        #expect(model.isRecipe(tomato.id, in: soups))
+    }
+
+    @Test func blankCollectionNamesAreIgnored() async throws {
+        let model = try await model(with: [])
+        model.addCollection(named: "   ")
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(model.collections.isEmpty)
+    }
+
+    @Test func deletingTheOpenCollectionReturnsToAllRecipes() async throws {
+        let model = try await model(with: ["Tomato"])
+        model.addCollection(named: "Soups")
+        try await waitUntil { model.collections.count == 1 }
+        let soups = try #require(model.collections.first)
+        model.selection = .collection(soups.id)
+
+        model.delete(soups)
+        try await waitUntil { model.collections.isEmpty }
+        try await waitUntil { model.selection == .all }
+        #expect(model.shownRecipes.count == 1)
+    }
+
+    @Test func editingASavedRecipeKeepsItInTheCookbook() async throws {
+        let model = try await model(with: ["Tomato"])
+        var recipe = try #require(model.recipes.first)
+        model.openRecipeID = recipe.id
+        model.isEditing = true
+        recipe.title = "Roast Tomato"
+        model.saveToCookbook(recipe)
+
+        #expect(!model.isEditing)
+        #expect(model.openRecipeID == recipe.id)
+        try await waitUntil { model.recipes.first?.title == "Roast Tomato" }
+    }
+}
