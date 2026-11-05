@@ -58,7 +58,6 @@ public final class AppModel {
             await checkSetup()
             applyDebugLaunchOptions()
         }
-        Task { await TextRecognizer().warmUp() }
     }
 
     /// The real app, keeping its data in Application Support. ZENDISH_DATA_DIR overrides the
@@ -67,6 +66,7 @@ public final class AppModel {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let override = ProcessInfo.processInfo.environment["ZENDISH_DATA_DIR"]
         let folder = override.map { URL(fileURLWithPath: $0) } ?? support.appendingPathComponent("Zendish")
+        Task { await TextRecognizer().warmUp() }
         do {
             return AppModel(
                 store: try RecipeStore(url: folder.appendingPathComponent("zendish.sqlite")),

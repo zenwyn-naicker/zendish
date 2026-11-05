@@ -14,6 +14,14 @@ struct StubWriter: CardWriter {
     }
 }
 
+/// Stands in for text recognition, which is very slow on virtual Macs without a GPU. Reading
+/// real images has its own tests in `TextRecognizerTests`.
+struct StubReader: TextReader {
+    func text(from images: [URL]) async throws -> String {
+        "Soup\n2 cups stock\n1 tsp salt\nSimmer."
+    }
+}
+
 struct SlowWriter: CardWriter {
     func writeCard(from text: String) async throws -> CardDraft {
         try await Task.sleep(for: .seconds(1))
@@ -58,7 +66,7 @@ func writeRecipeImage(_ lines: [String], to url: URL) throws {
         return AppModel(
             store: try RecipeStore(),
             library: try ImageLibrary(folder: folder.appendingPathComponent("Images")),
-            maker: CardMaker(writer: writer)
+            maker: CardMaker(reader: StubReader(), writer: writer)
         )
     }
 
@@ -123,7 +131,7 @@ func writeRecipeImage(_ lines: [String], to url: URL) throws {
         let model = AppModel(
             store: try RecipeStore(),
             library: try ImageLibrary(folder: folder.appendingPathComponent("Images")),
-            maker: CardMaker(writer: StubWriter())
+            maker: CardMaker(reader: StubReader(), writer: StubWriter())
         )
         let url = folder.appendingPathComponent("soup.png")
         try writeRecipeImage(["Soup", "2 cups stock", "1 tsp salt", "Simmer."], to: url)
@@ -161,7 +169,7 @@ func writeRecipeImage(_ lines: [String], to url: URL) throws {
         try writeRecipeImage(["Soup", "2 cups stock", "1 tsp salt", "Simmer."], to: image)
         try await store.save(Recipe(imageNames: [try library.add(image)], status: .reading))
 
-        let model = AppModel(store: store, library: library, maker: CardMaker(writer: StubWriter()))
+        let model = AppModel(store: store, library: library, maker: CardMaker(reader: StubReader(), writer: StubWriter()))
         try await waitUntil { model.reviewQueue.first?.status == .needsReview }
         #expect(model.reviewQueue.first?.title == "Soup")
     }
@@ -171,7 +179,7 @@ func writeRecipeImage(_ lines: [String], to url: URL) throws {
         let model = AppModel(
             store: try RecipeStore(),
             library: try ImageLibrary(folder: folder.appendingPathComponent("Images")),
-            maker: CardMaker(writer: SlowWriter())
+            maker: CardMaker(reader: StubReader(), writer: SlowWriter())
         )
         let image = folder.appendingPathComponent("soup.png")
         try writeRecipeImage(["Soup", "2 cups stock", "1 tsp salt", "Simmer."], to: image)
@@ -202,7 +210,7 @@ func writeRecipeImage(_ lines: [String], to url: URL) throws {
         for title in titles {
             try await store.save(Recipe(title: title, ingredients: [Ingredient(text: "1 cup \(title) stock")], status: .saved))
         }
-        let model = AppModel(store: store, library: try ImageLibrary(folder: folder), maker: CardMaker(writer: StubWriter()))
+        let model = AppModel(store: store, library: try ImageLibrary(folder: folder), maker: CardMaker(reader: StubReader(), writer: StubWriter()))
         try await waitUntil { model.recipes.count == titles.count }
         return model
     }

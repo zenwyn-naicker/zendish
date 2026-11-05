@@ -12,16 +12,16 @@ public struct MadeCard: Equatable, Sendable {
 
 /// Takes images through text recognition, the model and the card checks.
 public struct CardMaker: Sendable {
-    private let recognizer: TextRecognizer
+    private let reader: any TextReader
     private let writer: any CardWriter
 
-    public init(recognizer: TextRecognizer = TextRecognizer(), writer: any CardWriter = OllamaClient()) {
-        self.recognizer = recognizer
+    public init(reader: any TextReader = TextRecognizer(), writer: any CardWriter = OllamaClient()) {
+        self.reader = reader
         self.writer = writer
     }
 
     public func makeCard(from images: [URL]) async throws -> MadeCard {
-        let text = try await recognizer.text(from: images)
+        let text = try await reader.text(from: images)
         return try await makeCard(fromText: text, imageNames: images.map(\.lastPathComponent))
     }
 
