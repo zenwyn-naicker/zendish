@@ -11,18 +11,18 @@ func drawIcon(size: CGFloat) -> NSBitmapImageRep {
     NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmap)
     let inset = size * 0.098
     let tile = NSRect(x: inset, y: inset, width: size - inset * 2, height: size - inset * 2)
-    NSColor(red: 0.18, green: 0.49, blue: 0.31, alpha: 1).setFill()
+    NSColor(red: 0.81, green: 0.88, blue: 0.80, alpha: 1).setFill()
     NSBezierPath(roundedRect: tile, xRadius: size * 0.18, yRadius: size * 0.18).fill()
 
     let center = NSPoint(x: size / 2, y: size / 2)
     func circle(_ radius: CGFloat) -> NSBezierPath {
         NSBezierPath(ovalIn: NSRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2))
     }
-    NSColor(red: 0.96, green: 0.97, blue: 0.945, alpha: 1).setFill()
+    NSColor.white.setFill()
     circle(size * 0.285).fill()
     let rim = circle(size * 0.195)
     rim.lineWidth = size * 0.012
-    NSColor(red: 0.18, green: 0.49, blue: 0.31, alpha: 0.35).setStroke()
+    NSColor(red: 0.18, green: 0.49, blue: 0.31, alpha: 1).setStroke()
     rim.stroke()
     NSGraphicsContext.restoreGraphicsState()
     return bitmap
