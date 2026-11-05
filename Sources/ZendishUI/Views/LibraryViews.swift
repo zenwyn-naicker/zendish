@@ -185,7 +185,7 @@ struct RecipeTile: View {
     }
 
     private var summary: String? {
-        let parts = [recipe.totalTime, recipe.servings].compactMap { $0 }
+        let parts = [recipe.totalTime, recipe.servingsText].compactMap { $0 }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 }
@@ -272,7 +272,7 @@ struct RecipeView: View {
     private var details: String {
         [
             recipe.totalTime.map { "Total \($0)" }, recipe.prepTime.map { "Prep \($0)" },
-            recipe.cookTime.map { "Cook \($0)" }, recipe.servings,
+            recipe.cookTime.map { "Cook \($0)" }, recipe.servingsText,
         ].compactMap { $0 }.joined(separator: "  ·  ")
     }
 
@@ -297,7 +297,7 @@ struct RecipeView: View {
                     Text(step)
                         .lineSpacing(3)
                         .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(idealWidth: 340, maxWidth: .infinity, alignment: .leading)
                 }
             }
         }
@@ -346,6 +346,17 @@ struct CropSheet: View {
     }
 }
 
+/// Turns a drag into a crop measured in 0-to-1 fractions, kept inside the image.
+func cropBox(from start: CGPoint, to end: CGPoint, in size: CGSize) -> CGRect {
+    let box = CGRect(
+        x: min(start.x, end.x) / size.width,
+        y: min(start.y, end.y) / size.height,
+        width: abs(end.x - start.x) / size.width,
+        height: abs(end.y - start.y) / size.height
+    )
+    return box.intersection(CGRect(x: 0, y: 0, width: 1, height: 1))
+}
+
 private struct CropOverlay: View {
     @Binding var crop: CGRect?
 
@@ -363,9 +374,7 @@ private struct CropOverlay: View {
                 }
             }
             .gesture(DragGesture(minimumDistance: 4).onChanged { drag in
-                let x = min(drag.startLocation.x, drag.location.x), y = min(drag.startLocation.y, drag.location.y)
-                let box = CGRect(x: x / size.width, y: y / size.height, width: abs(drag.translation.width) / size.width, height: abs(drag.translation.height) / size.height)
-                crop = box.intersection(CGRect(x: 0, y: 0, width: 1, height: 1))
+                crop = cropBox(from: drag.startLocation, to: drag.location, in: size)
             })
         }
     }

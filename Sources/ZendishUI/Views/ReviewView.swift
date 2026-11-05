@@ -7,6 +7,9 @@ struct ReviewView: View {
     @State private var draft: Recipe
     @State private var isConfirmingDiscard = false
     @State private var isChoosingPhoto = false
+    /// Set once the card has been saved, discarded or sent back to be read, so leaving the
+    /// screen doesn't write older edits over the result.
+    @State private var isFinished = false
 
     init(model: AppModel, recipe: Recipe) {
         self.model = model
@@ -52,20 +55,29 @@ struct ReviewView: View {
                     .help("Delete this recipe and its images")
             }
             ToolbarItem(placement: .primaryAction) {
-                Button(draft.status == .saved ? "Save Changes" : "Save to Cookbook") { model.saveToCookbook(draft) }
+                Button(draft.status == .saved ? "Save Changes" : "Save to Cookbook") {
+                    isFinished = true
+                    model.saveToCookbook(draft)
+                }
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut("s")
             }
         }
         .confirmationDialog("Delete this recipe?", isPresented: $isConfirmingDiscard) {
-            Button("Delete", role: .destructive) { model.delete(draft) }
+            Button("Delete", role: .destructive) {
+                isFinished = true
+                model.delete(draft)
+            }
         } message: {
             Text("The card and its images will be removed from Zendish. This can't be undone.")
+        }
+        // Moving elsewhere in the sidebar also closes this screen, so edits are always kept.
+        .onDisappear {
+            if !isFinished { model.update(draft) }
         }
     }
 
     private func closeKeepingEdits() {
-        model.update(draft)
         if draft.status == .saved {
             model.isEditing = false
         } else {
@@ -79,6 +91,7 @@ struct ReviewView: View {
         if let problem = draft.problem {
             Banner(systemImage: "exclamationmark.triangle", text: problem) {
                 Button("Try Again") {
+                    isFinished = true
                     model.retry(draft)
                     model.openRecipeID = nil
                 }
@@ -124,7 +137,7 @@ struct ReviewView: View {
     }
 
     private func detailField(_ path: WritableKeyPath<Recipe, String?>) -> some View {
-        TextField("", text: text(path), prompt: Text("Not given"))
+        TextField("", text: text(path), prompt: Text("–"))
             .textFieldStyle(.roundedBorder)
     }
 

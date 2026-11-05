@@ -71,7 +71,7 @@ public final class AppModel {
             return AppModel(
                 store: try RecipeStore(url: folder.appendingPathComponent("zendish.sqlite")),
                 library: try ImageLibrary(folder: folder.appendingPathComponent("Images")),
-                ollama: OllamaClient()
+                ollama: debugOllamaClient() ?? OllamaClient()
             )
         } catch {
             fatalError("Zendish couldn't open its data folder: \(error)")
@@ -392,10 +392,24 @@ public final class AppModel {
 
     // MARK: Inspection
 
+    /// Debug builds can point at a missing Ollama or model, to inspect the setup bar.
+    private static func debugOllamaClient() -> OllamaClient? {
+        #if DEBUG
+        let environment = ProcessInfo.processInfo.environment
+        if let url = environment["ZENDISH_OLLAMA_URL"].flatMap(URL.init(string:)) { return OllamaClient(baseURL: url) }
+        if let model = environment["ZENDISH_MODEL"] { return OllamaClient(model: model) }
+        #endif
+        return nil
+    }
+
     /// Debug builds can open a screen directly, so each one can be inspected automatically.
     private func applyDebugLaunchOptions() {
         #if DEBUG
         let environment = ProcessInfo.processInfo.environment
+        if environment["ZENDISH_ACTIVATE"] != nil { NSApp.activate(ignoringOtherApps: true) }
+        if let size = environment["ZENDISH_SIZE"]?.split(separator: "x").compactMap({ Double($0) }), size.count == 2 {
+            NSApp.windows.first?.setContentSize(NSSize(width: size[0], height: size[1]))
+        }
         switch environment["ZENDISH_SHOW"] {
         case "review":
             selection = .toReview

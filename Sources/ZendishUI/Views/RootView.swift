@@ -30,6 +30,14 @@ public struct RootView: View {
         }
         .searchable(text: $model.searchText, placement: .sidebar, prompt: "Dish or ingredient")
         .task(id: model.searchText) { await model.search() }
+        .onChange(of: model.searchText) { model.openRecipeID = nil }
+        .task {
+            // Notices when Ollama is opened or the model arrives, without needing a click.
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(4))
+                if model.setup != .ready { await model.checkSetup() }
+            }
+        }
         .dropDestination(for: URL.self) { urls, _ in
             model.receive(urls)
             return true

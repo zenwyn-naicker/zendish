@@ -14,6 +14,13 @@ struct StubWriter: CardWriter {
     }
 }
 
+struct SlowWriter: CardWriter {
+    func writeCard(from text: String) async throws -> CardDraft {
+        try await Task.sleep(for: .seconds(1))
+        return CardDraft(title: "Soup", ingredients: ["2 cups stock"], steps: ["Simmer."])
+    }
+}
+
 @MainActor
 func waitUntil(_ condition: @escaping () -> Bool) async throws {
     for _ in 0..<600 {
@@ -136,6 +143,47 @@ func writeRecipeImage(_ lines: [String], to url: URL) throws {
         #expect(model.reviewQueue.isEmpty)
     }
 
+    @Test func editsKeptOnLeavingStayInTheReviewQueue() async throws {
+        let (model, recipe) = try await reviewedCard()
+        var edited = recipe
+        edited.title = "Half-finished edit"
+        model.update(edited)
+
+        try await waitUntil { model.reviewQueue.first?.title == "Half-finished edit" }
+        #expect(model.reviewQueue.first?.status == .needsReview)
+    }
+
+    @Test func aCardInterruptedByQuittingIsReadOnNextLaunch() async throws {
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let store = try RecipeStore()
+        let library = try ImageLibrary(folder: folder.appendingPathComponent("Images"))
+        let image = folder.appendingPathComponent("soup.png")
+        try writeRecipeImage(["Soup", "2 cups stock", "1 tsp salt", "Simmer."], to: image)
+        try await store.save(Recipe(imageNames: [try library.add(image)], status: .reading))
+
+        let model = AppModel(store: store, library: library, maker: CardMaker(writer: StubWriter()))
+        try await waitUntil { model.reviewQueue.first?.status == .needsReview }
+        #expect(model.reviewQueue.first?.title == "Soup")
+    }
+
+    @Test func discardingWhileReadingDoesNotBringTheCardBack() async throws {
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let model = AppModel(
+            store: try RecipeStore(),
+            library: try ImageLibrary(folder: folder.appendingPathComponent("Images")),
+            maker: CardMaker(writer: SlowWriter())
+        )
+        let image = folder.appendingPathComponent("soup.png")
+        try writeRecipeImage(["Soup", "2 cups stock", "1 tsp salt", "Simmer."], to: image)
+        model.receive([image])
+        try await waitUntil { model.reviewQueue.first?.status == .reading }
+
+        model.delete(try #require(model.reviewQueue.first))
+        try await Task.sleep(for: .seconds(2))
+        await model.refresh()
+        #expect(model.recipes.isEmpty)
+    }
+
     @Test func discardingRemovesTheCardAndItsImages() async throws {
         let (model, recipe) = try await reviewedCard()
         let stored = model.library.url(for: try #require(recipe.imageNames.first))
@@ -217,5 +265,24 @@ func writeRecipeImage(_ lines: [String], to url: URL) throws {
         #expect(!model.isEditing)
         #expect(model.openRecipeID == recipe.id)
         try await waitUntil { model.recipes.first?.title == "Roast Tomato" }
+    }
+}
+
+@Suite struct CropBoxTests {
+    private let size = CGSize(width: 200, height: 100)
+
+    @Test func aDragBecomesFractions() {
+        let box = cropBox(from: CGPoint(x: 20, y: 10), to: CGPoint(x: 120, y: 60), in: size)
+        #expect(box == CGRect(x: 0.1, y: 0.1, width: 0.5, height: 0.5))
+    }
+
+    @Test func draggingUpAndLeftWorks() {
+        let box = cropBox(from: CGPoint(x: 120, y: 60), to: CGPoint(x: 20, y: 10), in: size)
+        #expect(box == CGRect(x: 0.1, y: 0.1, width: 0.5, height: 0.5))
+    }
+
+    @Test func aDragPastTheEdgeStaysInsideTheImage() {
+        let box = cropBox(from: CGPoint(x: 100, y: 50), to: CGPoint(x: 400, y: 300), in: size)
+        #expect(box == CGRect(x: 0.5, y: 0.5, width: 0.5, height: 0.5))
     }
 }
