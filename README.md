@@ -98,7 +98,7 @@ Ollama is the free app that runs the AI on your Mac, so your recipes never leave
 
 **How accurate is it?** It's good, but it isn't perfect, which is why every card is checked beside its original before saving. You can see the test results [below](#evaluation).
 
-**Does it work with handwritten recipes?** Not reliably yet. Zendish works best with clear, printed text.
+**Does it work with handwritten recipes?** That hasn't been tested yet. Zendish is made for clear, printed text.
 
 **Can I use it on my phone?** Not yet, because accurate local AI needs more memory than most phones have. Your screenshots can reach your Mac through iCloud Photos or AirDrop.
 
