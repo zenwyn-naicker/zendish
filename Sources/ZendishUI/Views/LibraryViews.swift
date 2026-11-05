@@ -253,34 +253,27 @@ struct RecipeView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
+            VStack(alignment: .leading, spacing: 20) {
                 if let cover = recipe.coverName {
                     LibraryImage(library: model.library, name: cover, maxPixels: 1600, fill: true)
-                        .frame(height: 240)
+                        .frame(height: 220)
                         .frame(maxWidth: .infinity)
-                        .clipShape(.rect(cornerRadius: 12))
+                        .clipShape(.rect(cornerRadius: 14))
                 }
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(recipe.title ?? "Untitled recipe")
-                        .font(.largeTitle.weight(.bold))
-                        .textSelection(.enabled)
-                    if !details.isEmpty {
-                        Text(details).foregroundStyle(Theme.muted)
-                    }
-                }
+                header
                 ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .top, spacing: 44) {
-                        ingredients.frame(width: 270, alignment: .leading)
+                    HStack(alignment: .top, spacing: 16) {
+                        ingredients.frame(width: 340)
                         steps
                     }
-                    VStack(alignment: .leading, spacing: 26) {
+                    VStack(alignment: .leading, spacing: 16) {
                         ingredients
                         steps
                     }
                 }
             }
-            .padding(32)
-            .frame(maxWidth: 920, alignment: .leading)
+            .padding(28)
+            .frame(maxWidth: 1000, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
         .navigationTitle("")
@@ -308,39 +301,98 @@ struct RecipeView: View {
         }
     }
 
-    private var details: String {
-        [
-            recipe.totalTime.map { "Total \($0)" }, recipe.prepTime.map { "Prep \($0)" },
-            recipe.cookTime.map { "Cook \($0)" }, recipe.servingsText,
-        ].compactMap { $0 }.joined(separator: "  ·  ")
-    }
-
-    private var ingredients: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            Text("Ingredients").font(.title3.weight(.semibold)).foregroundStyle(Theme.accent)
-            ForEach(Array(recipe.ingredients.enumerated()), id: \.offset) { _, ingredient in
-                Text(ingredient.text).textSelection(.enabled)
-            }
-        }
-    }
-
-    private var steps: some View {
-        VStack(alignment: .leading, spacing: 13) {
-            Text("Method").font(.title3.weight(.semibold)).foregroundStyle(Theme.accent)
-            ForEach(Array(recipe.steps.enumerated()), id: \.offset) { index, step in
-                HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Text("\(index + 1)")
-                        .fontWeight(.semibold)
-                        .foregroundStyle(Theme.accent)
-                        .monospacedDigit()
-                        .frame(width: 20, alignment: .trailing)
-                    Text(step)
-                        .lineSpacing(3)
-                        .textSelection(.enabled)
-                        .frame(idealWidth: 340, maxWidth: .infinity, alignment: .leading)
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(recipe.title ?? "Untitled recipe")
+                .font(.largeTitle.weight(.bold))
+                .foregroundStyle(recipe.title == nil ? Theme.muted : Theme.text)
+                .textSelection(.enabled)
+            if !details.isEmpty {
+                HStack(spacing: 6) {
+                    ForEach(details, id: \.self) { detail in
+                        Text(detail)
+                            .font(.callout)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 3)
+                            .background(Theme.sidebar, in: .capsule)
+                    }
                 }
             }
         }
+    }
+
+    private var details: [String] {
+        [
+            recipe.totalTime.map { "Total \($0)" }, recipe.prepTime.map { "Prep \($0)" },
+            recipe.cookTime.map { "Cook \($0)" }, recipe.servingsText,
+        ].compactMap { $0 }
+    }
+
+    private var ingredients: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Ingredients")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(Theme.accent)
+                .padding(.bottom, 8)
+            ForEach(Array(recipe.ingredients.enumerated()), id: \.offset) { index, ingredient in
+                let parts = ingredient.parts
+                if let section = ingredient.section, section != recipe.ingredients[safe: index - 1]?.section {
+                    Text(section)
+                        .font(.callout.weight(.semibold))
+                        .foregroundStyle(Theme.muted)
+                        .padding(.top, index == 0 ? 2 : 14)
+                        .padding(.bottom, 2)
+                }
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Text(parts.quantity ?? "")
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Theme.accent)
+                        .frame(width: 92, alignment: .leading)
+                    Text(parts.name)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .textSelection(.enabled)
+                .padding(.vertical, 7)
+                .overlay(alignment: .bottom) {
+                    if index < recipe.ingredients.count - 1 {
+                        Rectangle().fill(Theme.line).frame(height: 0.5)
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .background(Theme.surface, in: .rect(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Theme.line, lineWidth: 0.5))
+    }
+
+    /// One card per step, which makes it easy to keep your place while cooking.
+    private var steps: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(Array(recipe.steps.enumerated()), id: \.offset) { index, step in
+                HStack(alignment: .top, spacing: 12) {
+                    Text("\(index + 1)")
+                        .font(.callout.weight(.semibold))
+                        .foregroundStyle(Theme.accent)
+                        .monospacedDigit()
+                        .frame(width: 28, height: 28)
+                        .background(Theme.sidebar, in: .circle)
+                    Text(step)
+                        .lineSpacing(4)
+                        .textSelection(.enabled)
+                        .padding(.top, 4)
+                        .frame(idealWidth: 320, maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(14)
+                .background(Theme.surface, in: .rect(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.line, lineWidth: 0.5))
+            }
+        }
+    }
+}
+
+private extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }
 

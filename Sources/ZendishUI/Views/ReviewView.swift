@@ -26,6 +26,11 @@ struct ReviewView: View {
                     TextField("Title", text: text(\.title), prompt: Text("Recipe title"))
                         .font(.title2.weight(.semibold))
                         .textFieldStyle(.plain)
+                    if draft.title == nil, draft.flags.contains(.needsTitle) {
+                        Text("No recipe name was found. Add one so it's easy to find.")
+                            .font(.callout)
+                            .foregroundStyle(Theme.flag)
+                    }
                     details
                     photo
                     ingredients
@@ -147,6 +152,13 @@ struct ReviewView: View {
             SectionTitle("Ingredients")
             ForEach(draft.ingredients.indices, id: \.self) { index in
                 VStack(alignment: .leading, spacing: 3) {
+                    if let section = draft.ingredients[index].section,
+                       index == 0 || draft.ingredients[index - 1].section != section {
+                        Text(section)
+                            .font(.callout.weight(.semibold))
+                            .foregroundStyle(Theme.muted)
+                            .padding(.top, index == 0 ? 0 : 6)
+                    }
                     EditableRow(text: $draft.ingredients[index].text, placeholder: "Ingredient", isFlagged: suggestion(for: index) != nil) {
                         draft.ingredients.remove(at: index)
                     }
