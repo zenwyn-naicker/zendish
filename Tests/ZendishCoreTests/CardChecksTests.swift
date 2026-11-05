@@ -48,6 +48,12 @@ import Testing
         #expect(!flags.contains(.missingLine("2 cups lettuce")))
     }
 
+    @Test func aLineSplitInTwoOnTheCardIsNotReportedMissing() {
+        let text = "Ingredients\n250 g cake flour, plus extra for dusting\n2 large eggs\nMethod\nMix well."
+        let card = CardDraft(ingredients: ["250 g cake flour", "extra for dusting", "2 large eggs"], steps: ["Mix well."])
+        #expect(CardChecks.check(card, against: text).flags.isEmpty)
+    }
+
     @Test func labelledDetailsAreKept() {
         let card = CardDraft(prepTime: "12 min", cookTime: "18 min", servings: "2")
         let checked = CardChecks.check(card, against: page)

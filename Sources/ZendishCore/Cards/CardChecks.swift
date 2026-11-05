@@ -6,6 +6,8 @@ public enum CardFlag: Equatable, Hashable, Sendable, Codable {
     case checkQuantity(line: String, suggestion: String)
     /// A line that looks like an ingredient is in the image but not on the card.
     case missingLine(String)
+    /// The images don't seem to contain a recipe.
+    case noRecipe
 }
 
 public struct CheckedCard: Equatable, Sendable {
@@ -115,7 +117,7 @@ public enum CardChecks {
     private static func missingLines(from lines: [String], card: CardDraft) -> [String] {
         let onCard = card.ingredients
         guard let firstMatch = lines.firstIndex(where: { line in
-            onCard.contains { RecipeText.overlap(of: line, in: $0) >= 0.7 }
+            isCovered(line, by: onCard)
         }) else { return [] }
         let heading = lines[..<firstMatch].lastIndex { ["ingredients", "ingredient"].contains(RecipeText.normalized($0)) }
         let start = heading ?? firstMatch
@@ -125,8 +127,15 @@ public enum CardChecks {
             end = found
         }
         guard start < end else { return [] }
-        return lines[start..<end].filter { line in
-            isIngredientLike(line) && !onCard.contains { RecipeText.overlap(of: line, in: $0) >= 0.7 }
+        return lines[start..<end].filter { isIngredientLike($0) && !isCovered($0, by: onCard) }
+    }
+
+    /// A long line can reach the card split in two, so a card line that sits wholly inside the
+    /// image line also counts.
+    private static func isCovered(_ line: String, by card: [String]) -> Bool {
+        card.contains { item in
+            RecipeText.overlap(of: line, in: item) >= 0.7
+                || (!RecipeText.numbers(in: item).isEmpty && RecipeText.overlap(of: item, in: line) >= 0.9)
         }
     }
 
