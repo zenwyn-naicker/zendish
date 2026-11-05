@@ -66,6 +66,66 @@ public struct OllamaClient: CardWriter {
         }
     }
 
+    /// What Ollama reports about this Mac's setup.
+    public enum Readiness: Equatable, Sendable {
+        case notRunning
+        case modelMissing
+        case ready
+    }
+
+    public func readiness() async -> Readiness {
+        var request = URLRequest(url: baseURL.appendingPathComponent("api/tags"))
+        request.timeoutInterval = 3
+        guard let (data, response) = try? await session.data(for: request),
+              (response as? HTTPURLResponse)?.statusCode == 200 else { return .notRunning }
+        let installed = (try? JSONDecoder().decode(Installed.self, from: data))?.models.map(\.name) ?? []
+        return installed.contains(model) ? .ready : .modelMissing
+    }
+
+    /// Downloads the model, reporting progress from 0 to 1. A model arrives in several pieces,
+    /// so progress is added up across them and is never allowed to go backwards.
+    public func downloadModel(progress: @Sendable @escaping (Double) -> Void) async throws {
+        var request = URLRequest(url: baseURL.appendingPathComponent("api/pull"))
+        request.httpMethod = "POST"
+        request.timeoutInterval = 3600
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["model": model, "stream": true])
+
+        let (lines, response): (URLSession.AsyncBytes, URLResponse)
+        do {
+            (lines, response) = try await session.bytes(for: request)
+        } catch let error as URLError where error.code != .cancelled {
+            throw OllamaError.notRunning
+        }
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw OllamaError.failed("the download couldn't start") }
+
+        var pieces: [String: (done: Int64, total: Int64)] = [:]
+        var shown = 0.0
+        for try await line in lines.lines {
+            let update = try JSONDecoder().decode(PullUpdate.self, from: Data(line.utf8))
+            if let error = update.error { throw OllamaError.failed(error) }
+            guard let digest = update.digest, let total = update.total, total > 0 else { continue }
+            pieces[digest] = (update.completed ?? 0, total)
+            let overall = Double(pieces.values.map(\.done).reduce(0, +)) / Double(pieces.values.map(\.total).reduce(0, +))
+            if overall > shown {
+                shown = overall
+                progress(shown)
+            }
+        }
+    }
+
+    private struct Installed: Decodable {
+        struct Model: Decodable { let name: String }
+        let models: [Model]
+    }
+
+    private struct PullUpdate: Decodable {
+        let digest: String?
+        let total: Int64?
+        let completed: Int64?
+        let error: String?
+    }
+
     func send(_ request: URLRequest) async throws -> (Data, URLResponse) {
         do {
             return try await session.data(for: request)

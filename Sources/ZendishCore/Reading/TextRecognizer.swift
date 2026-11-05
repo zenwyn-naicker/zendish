@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import ImageIO
 import Vision
@@ -25,6 +26,19 @@ public struct TextRecognizer: Sendable {
                 pages.append(try Self.readLines(from: image).joined(separator: "\n"))
             }
             return pages.joined(separator: "\n\n")
+        }.value
+    }
+
+    /// Loads the recognition system early. The first read otherwise takes about 30 seconds.
+    public func warmUp() async {
+        await Task.detached(priority: .utility) {
+            guard let context = CGContext(
+                data: nil, width: 64, height: 64, bitsPerComponent: 8, bytesPerRow: 0,
+                space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue
+            ), let image = context.makeImage() else { return }
+            let request = VNRecognizeTextRequest()
+            request.recognitionLevel = .accurate
+            try? VNImageRequestHandler(cgImage: image, options: [:]).perform([request])
         }.value
     }
 
