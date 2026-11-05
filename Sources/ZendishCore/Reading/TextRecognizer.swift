@@ -13,8 +13,13 @@ public enum TextRecognitionError: Error, Equatable, CustomStringConvertible {
     }
 }
 
+/// Anything that can read text from images.
+public protocol TextReader: Sendable {
+    func text(from images: [URL]) async throws -> String
+}
+
 /// Reads text from images with macOS text recognition, entirely on this Mac.
-public struct TextRecognizer: Sendable {
+public struct TextRecognizer: TextReader {
     public init() {}
 
     /// Reads the images in order and returns their text, one line per line found.

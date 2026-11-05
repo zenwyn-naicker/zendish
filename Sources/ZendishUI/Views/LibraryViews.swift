@@ -9,16 +9,20 @@ struct SidebarView: View {
 
     var body: some View {
         List(selection: $model.selection) {
-            Label("All Recipes", systemImage: "book").tag(SidebarItem.all)
-            Label("To Review", systemImage: "checklist")
+            SidebarLabel("All Recipes", symbol: "book")
+                .tag(SidebarItem.all)
+                .listRowBackground(rowBackground(.all))
+            SidebarLabel("To Review", symbol: "checklist")
                 .badge(model.reviewQueue.count)
                 .tag(SidebarItem.toReview)
+                .listRowBackground(rowBackground(.toReview))
 
             Section {
                 ForEach(model.collections) { collection in
-                    Label(collection.name, systemImage: "folder")
+                    SidebarLabel(collection.name, symbol: "folder")
                         .badge(model.members[collection.id]?.count ?? 0)
                         .tag(SidebarItem.collection(collection.id))
+                        .listRowBackground(rowBackground(.collection(collection.id)))
                         .contextMenu {
                             Button("Rename…") {
                                 name = collection.name
@@ -46,6 +50,8 @@ struct SidebarView: View {
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(Theme.sidebar)
         .alert("New Collection", isPresented: $isAddingCollection) {
             TextField("Weeknight dinners", text: $name)
             Button("Create") { model.addCollection(named: name) }
@@ -56,6 +62,32 @@ struct SidebarView: View {
             Button("Rename") { if let renaming { model.rename(renaming, to: name) } }
             Button("Cancel", role: .cancel) {}
         }
+    }
+}
+
+private struct SidebarLabel: View {
+    let title: String
+    let symbol: String
+
+    init(_ title: String, symbol: String) {
+        self.title = title
+        self.symbol = symbol
+    }
+
+    var body: some View {
+        Label {
+            Text(title).foregroundStyle(Theme.text)
+        } icon: {
+            Image(systemName: symbol).foregroundStyle(Theme.accent)
+        }
+    }
+}
+
+extension SidebarView {
+    fileprivate func rowBackground(_ item: SidebarItem) -> some View {
+        RoundedRectangle(cornerRadius: 7)
+            .fill(model.selection == item ? Theme.selection : .clear)
+            .padding(.horizontal, 8)
     }
 }
 
@@ -132,17 +164,24 @@ struct RecipeTile: View {
         Button {
             model.openRecipeID = recipe.id
         } label: {
-            VStack(alignment: .leading, spacing: 7) {
+            VStack(alignment: .leading, spacing: 0) {
                 cover
                     .aspectRatio(4 / 3, contentMode: .fit)
-                    .clipShape(.rect(cornerRadius: 10))
-                Text(recipe.status == .reading ? "Reading recipe…" : recipe.title ?? "Untitled recipe")
-                    .font(.headline)
-                    .foregroundStyle(recipe.title == nil ? .secondary : .primary)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                caption
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(recipe.status == .reading ? "Reading recipe…" : recipe.title ?? "Untitled recipe")
+                        .font(.headline)
+                        .foregroundStyle(recipe.title == nil ? Theme.muted : Theme.text)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                    caption
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity, minHeight: 62, alignment: .topLeading)
             }
+            .background(Theme.surface)
+            .clipShape(.rect(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.line, lineWidth: 0.5))
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
@@ -158,7 +197,7 @@ struct RecipeTile: View {
 
     @ViewBuilder private var cover: some View {
         Rectangle()
-            .fill(.quaternary.opacity(0.5))
+            .fill(Theme.tile)
             .overlay {
                 if recipe.status == .reading {
                     ProgressView().controlSize(.small)
@@ -167,7 +206,7 @@ struct RecipeTile: View {
                 } else {
                     Image(systemName: "fork.knife")
                         .font(.title)
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(Theme.accent.opacity(0.55))
                 }
             }
             .clipped()
@@ -175,17 +214,17 @@ struct RecipeTile: View {
 
     @ViewBuilder private var caption: some View {
         if recipe.problem != nil {
-            Text("Couldn’t be read").font(.caption).foregroundStyle(.orange)
+            Text("Couldn’t be read").font(.caption).foregroundStyle(Theme.flag)
         } else if recipe.status == .needsReview, !recipe.flags.isEmpty {
             let count = recipe.flags.count
-            Text(count == 1 ? "1 thing to check" : "\(count) things to check").font(.caption).foregroundStyle(.orange)
+            Text(count == 1 ? "1 thing to check" : "\(count) things to check").font(.caption).foregroundStyle(Theme.flag)
         } else if let line = summary {
-            Text(line).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            Text(line).font(.caption).foregroundStyle(Theme.muted).lineLimit(1)
         }
     }
 
     private var summary: String? {
-        let parts = [recipe.totalTime, recipe.servings].compactMap { $0 }
+        let parts = [recipe.totalTime, recipe.servingsText].compactMap { $0 }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 }
@@ -226,7 +265,7 @@ struct RecipeView: View {
                         .font(.largeTitle.weight(.bold))
                         .textSelection(.enabled)
                     if !details.isEmpty {
-                        Text(details).foregroundStyle(.secondary)
+                        Text(details).foregroundStyle(Theme.muted)
                     }
                 }
                 ViewThatFits(in: .horizontal) {
@@ -272,13 +311,13 @@ struct RecipeView: View {
     private var details: String {
         [
             recipe.totalTime.map { "Total \($0)" }, recipe.prepTime.map { "Prep \($0)" },
-            recipe.cookTime.map { "Cook \($0)" }, recipe.servings,
+            recipe.cookTime.map { "Cook \($0)" }, recipe.servingsText,
         ].compactMap { $0 }.joined(separator: "  ·  ")
     }
 
     private var ingredients: some View {
         VStack(alignment: .leading, spacing: 9) {
-            Text("Ingredients").font(.title3.weight(.semibold))
+            Text("Ingredients").font(.title3.weight(.semibold)).foregroundStyle(Theme.accent)
             ForEach(Array(recipe.ingredients.enumerated()), id: \.offset) { _, ingredient in
                 Text(ingredient.text).textSelection(.enabled)
             }
@@ -287,17 +326,18 @@ struct RecipeView: View {
 
     private var steps: some View {
         VStack(alignment: .leading, spacing: 13) {
-            Text("Method").font(.title3.weight(.semibold))
+            Text("Method").font(.title3.weight(.semibold)).foregroundStyle(Theme.accent)
             ForEach(Array(recipe.steps.enumerated()), id: \.offset) { index, step in
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
                     Text("\(index + 1)")
-                        .foregroundStyle(.secondary)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Theme.accent)
                         .monospacedDigit()
                         .frame(width: 20, alignment: .trailing)
                     Text(step)
                         .lineSpacing(3)
                         .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(idealWidth: 340, maxWidth: .infinity, alignment: .leading)
                 }
             }
         }
@@ -336,14 +376,26 @@ struct CropSheet: View {
                     if let crop { choose(names[index], crop) }
                     dismiss()
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(PrimaryButtonStyle())
                 .keyboardShortcut(.defaultAction)
                 .disabled(crop == nil)
+                .opacity(crop == nil ? 0.5 : 1)
             }
         }
         .padding(20)
         .frame(width: 560)
     }
+}
+
+/// Turns a drag into a crop measured in 0-to-1 fractions, kept inside the image.
+func cropBox(from start: CGPoint, to end: CGPoint, in size: CGSize) -> CGRect {
+    let box = CGRect(
+        x: min(start.x, end.x) / size.width,
+        y: min(start.y, end.y) / size.height,
+        width: abs(end.x - start.x) / size.width,
+        height: abs(end.y - start.y) / size.height
+    )
+    return box.intersection(CGRect(x: 0, y: 0, width: 1, height: 1))
 }
 
 private struct CropOverlay: View {
@@ -357,15 +409,13 @@ private struct CropOverlay: View {
                 if let crop {
                     Rectangle()
                         .strokeBorder(.white, lineWidth: 2)
-                        .background(Color.accentColor.opacity(0.18))
+                        .background(Theme.accent.opacity(0.2))
                         .frame(width: crop.width * size.width, height: crop.height * size.height)
                         .offset(x: crop.minX * size.width, y: crop.minY * size.height)
                 }
             }
             .gesture(DragGesture(minimumDistance: 4).onChanged { drag in
-                let x = min(drag.startLocation.x, drag.location.x), y = min(drag.startLocation.y, drag.location.y)
-                let box = CGRect(x: x / size.width, y: y / size.height, width: abs(drag.translation.width) / size.width, height: abs(drag.translation.height) / size.height)
-                crop = box.intersection(CGRect(x: 0, y: 0, width: 1, height: 1))
+                crop = cropBox(from: drag.startLocation, to: drag.location, in: size)
             })
         }
     }
@@ -388,14 +438,14 @@ struct SetupBar: View {
             case .needsModel:
                 bar("Zendish needs its AI model, a one-time download of about 7.6 GB.") {
                     Button("Download") { model.downloadModel() }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(PrimaryButtonStyle())
                 }
             case .downloading(let progress):
                 bar("Downloading the AI model. You can keep using Zendish.") {
                     ProgressView(value: progress).frame(width: 160)
                     Text(progress, format: .percent.precision(.fractionLength(0)))
                         .monospacedDigit()
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                 }
             }
         }
@@ -410,7 +460,7 @@ struct SetupBar: View {
         .font(.callout)
         .padding(.horizontal, 16)
         .padding(.vertical, 9)
-        .background(.bar)
-        .overlay(alignment: .bottom) { Divider() }
+        .background(Theme.surface)
+        .overlay(alignment: .bottom) { Rectangle().fill(Theme.line).frame(height: 0.5) }
     }
 }

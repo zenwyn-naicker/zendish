@@ -26,4 +26,14 @@ import Testing
             for item in card.cleared { print("LIVE   cleared \(item)") }
         }
     }
+
+    /// Asks a real Ollama for a model that's already installed, which proves the download
+    /// messages are read correctly without fetching anything large.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["ZENDISH_LIVE_OLLAMA"] != nil))
+    func readRealDownloadMessages() async throws {
+        let client = OllamaClient(model: "nomic-embed-text:latest")
+        #expect(await client.readiness() == .ready)
+        try await client.downloadModel { print("LIVE progress \($0)") }
+        #expect(await OllamaClient(model: "not-a-real-model:1b").readiness() == .modelMissing)
+    }
 }

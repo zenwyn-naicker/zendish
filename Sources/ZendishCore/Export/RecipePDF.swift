@@ -52,7 +52,7 @@ public enum RecipePDF {
         add(recipe.title ?? "Untitled recipe", font: .systemFont(ofSize: 24, weight: .bold), spacing: 6)
         let details = [
             recipe.totalTime.map { "Total \($0)" }, recipe.prepTime.map { "Prep \($0)" },
-            recipe.cookTime.map { "Cook \($0)" }, recipe.servings,
+            recipe.cookTime.map { "Cook \($0)" }, recipe.servingsText,
         ].compactMap { $0 }
         if !details.isEmpty {
             add(details.joined(separator: "  ·  "), font: .systemFont(ofSize: 11), color: .darkGray, spacing: 6)
