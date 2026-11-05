@@ -12,22 +12,23 @@ public struct MadeCard: Equatable, Sendable {
 
 /// Takes images through text recognition, the model and the card checks.
 public struct CardMaker: Sendable {
-    private let recognizer: TextRecognizer
+    private let reader: any TextReader
     private let writer: any CardWriter
 
-    public init(recognizer: TextRecognizer = TextRecognizer(), writer: any CardWriter = OllamaClient()) {
-        self.recognizer = recognizer
+    public init(reader: any TextReader = TextRecognizer(), writer: any CardWriter = OllamaClient()) {
+        self.reader = reader
         self.writer = writer
     }
 
     public func makeCard(from images: [URL]) async throws -> MadeCard {
-        let text = try await recognizer.text(from: images)
+        let text = try await reader.text(from: images)
         return try await makeCard(fromText: text, imageNames: images.map(\.lastPathComponent))
     }
 
     public func makeCard(fromText text: String, imageNames: [String] = []) async throws -> MadeCard {
         guard CardChecks.hasRecipe(in: text) else {
-            return MadeCard(recipe: Recipe(imageNames: imageNames), flags: [], cleared: [], sourceText: text, hasRecipe: false)
+            let recipe = Recipe(imageNames: imageNames, flags: [.noRecipe], sourceText: text)
+            return MadeCard(recipe: recipe, flags: [.noRecipe], cleared: [], sourceText: text, hasRecipe: false)
         }
         let draft = try await writer.writeCard(from: text)
         let checked = CardChecks.check(draft, against: text)
@@ -40,8 +41,10 @@ public struct CardMaker: Sendable {
             prepTime: card.prepTime,
             cookTime: card.cookTime,
             servings: card.servings,
-            imageNames: imageNames
+            imageNames: imageNames,
+            flags: draft.isRecipe ? checked.flags : [.noRecipe],
+            sourceText: text
         )
-        return MadeCard(recipe: recipe, flags: checked.flags, cleared: checked.cleared, sourceText: text, hasRecipe: draft.isRecipe)
+        return MadeCard(recipe: recipe, flags: recipe.flags, cleared: checked.cleared, sourceText: text, hasRecipe: draft.isRecipe)
     }
 }

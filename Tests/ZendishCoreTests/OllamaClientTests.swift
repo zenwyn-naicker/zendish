@@ -35,6 +35,14 @@ final class FakeOllama: URLProtocol, @unchecked Sendable {
     }
 }
 
+final class Seen: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: [Double] = []
+
+    var values: [Double] { lock.withLock { stored } }
+    func add(_ value: Double) { lock.withLock { stored.append(value) } }
+}
+
 @Suite(.serialized) struct OllamaClientTests {
     private func client(host: String, status: Int = 200, body: String) -> OllamaClient {
         FakeOllama.replies[host] = (status, body)
@@ -76,6 +84,34 @@ final class FakeOllama: URLProtocol, @unchecked Sendable {
     @Test func aMissingModelIsReported() async {
         await #expect(throws: OllamaError.modelMissing(OllamaClient.defaultModel)) {
             _ = try await client(host: "missing", status: 404, body: #"{"error":"model not found"}"#).writeCard(from: "text")
+        }
+    }
+
+    @Test func readinessReflectsInstalledModels() async {
+        let installed = #"{"models":[{"name":"qwen3.5:9b"}]}"#
+        #expect(await client(host: "ready", body: installed).readiness() == .ready)
+        #expect(await client(host: "empty", body: #"{"models":[]}"#).readiness() == .modelMissing)
+    }
+
+    @Test func downloadProgressAddsUpAcrossPiecesAndNeverFalls() async throws {
+        let lines = [
+            #"{"status":"pulling manifest"}"#,
+            #"{"digest":"a","total":100,"completed":50}"#,
+            #"{"digest":"a","total":100,"completed":100}"#,
+            #"{"digest":"b","total":100,"completed":0}"#,
+            #"{"digest":"b","total":100,"completed":100}"#,
+            #"{"status":"success"}"#,
+        ].joined(separator: "\n")
+        let seen = Seen()
+        try await client(host: "pull", body: lines).downloadModel { seen.add($0) }
+
+        #expect(seen.values == seen.values.sorted())
+        #expect(seen.values.last == 1)
+    }
+
+    @Test func aDownloadErrorIsReported() async {
+        await #expect(throws: OllamaError.failed("disk full")) {
+            try await client(host: "pullfail", body: #"{"error":"disk full"}"#).downloadModel { _ in }
         }
     }
 

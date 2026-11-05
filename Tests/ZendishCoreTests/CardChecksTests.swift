@@ -96,6 +96,15 @@ import Testing
     }
 }
 
+@Suite struct ServingsTextTests {
+    @Test func bareNumbersGetALabelAndWordsStayAsWritten() {
+        #expect(Recipe(servings: "3").servingsText == "Serves 3")
+        #expect(Recipe(servings: "4-5").servingsText == "Serves 4-5")
+        #expect(Recipe(servings: "Makes 8 dumplings").servingsText == "Makes 8 dumplings")
+        #expect(Recipe().servingsText == nil)
+    }
+}
+
 @Suite struct CardMakerTests {
     struct FixedWriter: CardWriter {
         let draft: CardDraft
