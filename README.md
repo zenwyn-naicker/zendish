@@ -12,6 +12,8 @@ Free, powered by local AI through Ollama, and everything stays on your Mac.</p>
   <a href="https://github.com/zenwyn-naicker/zendish/releases/latest/download/Zendish.dmg"><strong>Download for Mac</strong></a>
 </p>
 
+![Zendish showing a recipe card beside its original screenshot, with a misread quantity flagged](docs/screenshots/review.png)
+
 ## What it does
 
 - **Add images your way:** drag them into the window or choose them from your Mac. Several images can make up one recipe.
@@ -22,6 +24,18 @@ Free, powered by local AI through Ollama, and everything stays on your Mac.</p>
 - **Build your cookbook:** organise recipes into collections, and search by dish or ingredient.
 - **Take it to the kitchen:** export a recipe or a whole collection as a PDF.
 - **Light or dark:** follows your Mac by default, or choose one in Settings.
+
+## Screenshots
+
+| Your cookbook | A clean card |
+|---|---|
+| ![A grid of recipe cards with collections in the sidebar](docs/screenshots/cookbook.png) | ![A recipe with its ingredients beside the method](docs/screenshots/recipe.png) |
+
+| Dark mode |
+|---|
+| ![The cookbook in dark mode](docs/screenshots/dark.png) |
+
+*The recipes and food illustrations shown are invented for testing.*
 
 ## Install Zendish
 
