@@ -35,7 +35,7 @@ public struct CardMaker: Sendable {
         let card = checked.draft
         let recipe = Recipe(
             title: card.title,
-            ingredients: card.ingredients.map { Ingredient(text: $0) },
+            ingredients: CardChecks.ingredients(from: card.ingredients),
             steps: card.steps,
             totalTime: card.totalTime,
             prepTime: card.prepTime,

@@ -8,6 +8,8 @@ public enum CardFlag: Equatable, Hashable, Sendable, Codable {
     case missingLine(String)
     /// The images don't seem to contain a recipe.
     case noRecipe
+    /// No recipe name was found, so a person should add one.
+    case needsTitle
 }
 
 public struct CheckedCard: Equatable, Sendable {
@@ -32,7 +34,7 @@ public enum CardChecks {
         var flags: [CardFlag] = []
         var cleared: [String] = []
 
-        draft.ingredients = card.ingredients.map(RecipeText.withoutMarker).filter { !$0.isEmpty }
+        draft.ingredients = joinedNotes(in: card.ingredients.map(RecipeText.withoutMarker).filter { !$0.isEmpty })
         draft.steps = card.steps.map(RecipeText.withoutMarker).filter { !$0.isEmpty }
 
         func clear(_ value: inout String?, _ name: String) {
@@ -49,8 +51,14 @@ public enum CardChecks {
 
         if let title = draft.title {
             let isPlaceholder = ["recipe", "ingredients", "method", "directions", "instructions"].contains(RecipeText.normalized(title))
-            if isPlaceholder || RecipeText.overlap(of: title, in: text) < 1 { clear(&draft.title, "Title") }
+            if isPlaceholder || looksLikeSiteName(title) || RecipeText.overlap(of: title, in: text) < 1 {
+                clear(&draft.title, "Title")
+            }
         }
+        if let title = draft.title, title == title.uppercased(), title.contains(where: \.isLetter) {
+            draft.title = title.capitalized
+        }
+        if draft.title == nil, !draft.ingredients.isEmpty { flags.append(.needsTitle) }
 
         for line in draft.ingredients {
             if let suggestion = fractionSuggestion(for: line) {
@@ -59,6 +67,58 @@ public enum CardChecks {
         }
         flags += missingLines(from: source, card: draft).map(CardFlag.missingLine)
         return CheckedCard(draft: draft, flags: flags, cleared: cleared)
+    }
+
+    /// Website logos such as "goodfood" get read as the title when the real one is off screen.
+    private static func looksLikeSiteName(_ title: String) -> Bool {
+        let word = RecipeText.normalized(title)
+        guard !word.contains(" ") else { return false }
+        return word.contains(/(food|recipe|kitchen|cook|eats?$|tasty|\.com|\.co)/)
+    }
+
+    /// Text recognition splits a long ingredient over two lines, and the model can keep them
+    /// apart, so a note like "chilled, cut in small pieces" joins the line above it.
+    private static func joinedNotes(in lines: [String]) -> [String] {
+        var joined: [String] = []
+        for line in lines {
+            if let last = joined.last, isIngredientNote(line) {
+                joined[joined.count - 1] = "\(last), \(line)"
+            } else {
+                joined.append(line)
+            }
+        }
+        return joined
+    }
+
+    private static func isIngredientNote(_ line: String) -> Bool {
+        line.contains(/^(preferably|chilled|cut |for (dusting|greasing|frying|serving|garnish)|plus |at room|softened|melted|finely|roughly|thinly|optional|divided|such as|or more|see note)/)
+    }
+
+    /// Turns card lines into ingredients, moving sub-headings such as "Filling" or
+    /// "For the sauce" onto the lines beneath them.
+    public static func ingredients(from lines: [String]) -> [Ingredient] {
+        var result: [Ingredient] = []
+        var section: String?
+        for (index, line) in lines.enumerated() {
+            if index + 1 < lines.count, isHeading(line) {
+                section = headingText(line)
+            } else {
+                result.append(Ingredient(text: line, section: section))
+            }
+        }
+        return result
+    }
+
+    private static func isHeading(_ line: String) -> Bool {
+        guard !line.contains(/[\d½¼¾⅓⅔⅛,]/), line.split(separator: " ").count <= 4 else { return false }
+        if line.hasSuffix(":") || line.contains(/^For (the|a|an)\s/) { return true }
+        if line == line.uppercased(), line.count > 3 { return true }
+        return line.contains(/(?i)^(the )?(filling|assembly|topping|sauce|dressing|marinade|dough|crust|base|glaze|frosting|garnish|batter|pastry|syrup|icing|spice paste|curry|salad|crumble)$/)
+    }
+
+    private static func headingText(_ line: String) -> String {
+        let trimmed = line.trimmingCharacters(in: CharacterSet(charactersIn: ": "))
+        return trimmed == trimmed.uppercased() ? trimmed.capitalized : trimmed
     }
 
     // MARK: Labels
