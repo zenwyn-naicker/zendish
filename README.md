@@ -32,6 +32,12 @@ Free, powered by local AI, and everything stays on your Mac.</p>
 - **Ready for the kitchen:** export one recipe or a whole collection as a PDF.
 - **Easy on the eyes:** a calm, fresh design in light or dark.
 
+## See it in action
+
+![A tour of Zendish: the cookbook, cards to review, a flagged quantity fixed in one click, a recipe page, a collection, search and dark mode](docs/screenshots/tour.gif)
+
+<p align="center"><sub>Made from screens captured in the app and joined together, using invented recipes and AI-generated photos. Reading a recipe isn't shown, and takes longer in real use.</sub></p>
+
 ## Screenshots
 
 | Your cookbook | A clean card |
