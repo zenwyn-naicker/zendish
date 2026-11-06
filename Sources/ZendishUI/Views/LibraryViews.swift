@@ -6,6 +6,7 @@ struct SidebarView: View {
     @State private var isAddingCollection = false
     @State private var renaming: RecipeCollection?
     @State private var name = ""
+    @State private var dropTarget: UUID?
 
     var body: some View {
         List(selection: $model.selection) {
@@ -20,6 +21,8 @@ struct SidebarView: View {
             Section {
                 ForEach(model.collections) { collection in
                     SidebarLabel(collection.name, symbol: "folder")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(.rect)
                         .badge(model.members[collection.id]?.count ?? 0)
                         .tag(SidebarItem.collection(collection.id))
                         .listRowBackground(rowBackground(.collection(collection.id)))
@@ -35,6 +38,8 @@ struct SidebarView: View {
                                 model.setRecipe(id, in: collection, to: true)
                             }
                             return true
+                        } isTargeted: { isOver in
+                            dropTarget = isOver ? collection.id : (dropTarget == collection.id ? nil : dropTarget)
                         }
                 }
             } header: {
@@ -84,9 +89,14 @@ private struct SidebarLabel: View {
 }
 
 extension SidebarView {
+    private func isHighlighted(_ item: SidebarItem) -> Bool {
+        if case .collection(let id) = item, id == dropTarget { return true }
+        return model.selection == item
+    }
+
     fileprivate func rowBackground(_ item: SidebarItem) -> some View {
         RoundedRectangle(cornerRadius: 7)
-            .fill(model.selection == item ? Theme.selection : .clear)
+            .fill(isHighlighted(item) ? Theme.selection : .clear)
             .padding(.horizontal, 8)
     }
 }
@@ -150,7 +160,7 @@ struct CookbookView: View {
             case .toReview:
                 ContentUnavailableView("Nothing to review", systemImage: "checkmark.circle", description: Text("New recipes appear here so you can check them before saving."))
             case .collection:
-                ContentUnavailableView("No recipes here yet", systemImage: "folder", description: Text("Drag a recipe onto this collection in the sidebar."))
+                ContentUnavailableView("No recipes here yet", systemImage: "folder", description: Text("Drag a recipe onto this collection in the sidebar, or right-click a recipe."))
             }
         }
     }
@@ -161,10 +171,8 @@ struct RecipeTile: View {
     let recipe: Recipe
 
     var body: some View {
-        Button {
-            model.openRecipeID = recipe.id
-        } label: {
-            VStack(alignment: .leading, spacing: 0) {
+        // A plain view rather than a Button: a Button keeps the mouse, so a drag never starts.
+        VStack(alignment: .leading, spacing: 0) {
                 cover
                     .aspectRatio(4 / 3, contentMode: .fit)
                 VStack(alignment: .leading, spacing: 3) {
@@ -183,16 +191,27 @@ struct RecipeTile: View {
             .clipShape(.rect(cornerRadius: 12))
             .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.line, lineWidth: 0.5))
             .contentShape(.rect)
+        .onTapGesture { open() }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { open() }
+        .draggable(recipe.id.uuidString) {
+            Text(recipe.title ?? "Untitled recipe")
+                .font(.headline)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Theme.surface, in: .rect(cornerRadius: 8))
         }
-        .buttonStyle(.plain)
-        .disabled(recipe.status == .reading)
-        .draggable(recipe.id.uuidString)
         .contextMenu {
             if !model.collections.isEmpty, recipe.status == .saved {
                 CollectionsMenu(model: model, recipeID: recipe.id)
             }
             Button("Delete", role: .destructive) { model.delete(recipe) }
         }
+    }
+
+    private func open() {
+        if recipe.status != .reading { model.openRecipeID = recipe.id }
     }
 
     @ViewBuilder private var cover: some View {
