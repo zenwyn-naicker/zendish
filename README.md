@@ -34,9 +34,9 @@ Free, powered by local AI, and everything stays on your Mac.</p>
 
 ## See it in action
 
-![A tour of Zendish: the cookbook, cards to review, a flagged quantity fixed in one click, a recipe page, a collection, search and dark mode](docs/screenshots/tour.gif)
+![Creating a recipe in Zendish: a screenshot is dragged in and read, a misread quantity is fixed in one click, a photo is added, and the recipe is saved, opened and found with search](docs/screenshots/tour.gif)
 
-<p align="center"><sub>Made from screens captured in the app and joined together, using invented recipes and AI-generated photos. Reading a recipe isn't shown, and takes longer in real use.</sub></p>
+<p align="center"><sub>Screens from a real run of the app, using an invented recipe and an AI-generated photo. The pointer and drags were added afterwards, and the wait while reading is shortened.</sub></p>
 
 ## Screenshots
 
